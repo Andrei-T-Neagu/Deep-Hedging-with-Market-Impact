@@ -63,7 +63,8 @@ class DeepAgent():
         self.params_vect = params_vect
         self.strike = strike
 
-        self.model = FFNN(in_features=6, num_layers=2, hidden_size=52)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = FFNN(in_features=6, num_layers=2, hidden_size=52).to(self.device)
         
         self.name = name
         print("Initial value of the portfolio: ", V_0)
@@ -71,7 +72,7 @@ class DeepAgent():
     # Simulate a batch of paths and hedging errors
     def simulate_batch(self):
 
-        self.delta_t = torch.zeros(self.batch_size) #number of shares at each time step
+        self.delta_t = torch.zeros(self.batch_size, device=self.device) #number of shares at each time step
         # Extract model parameters
         if self.stock_dyn == "BSM":
             self.mu, self.sigma = self.params_vect
@@ -79,35 +80,35 @@ class DeepAgent():
         # Portfolio value prior to trading at each time-step
         # If long, you buy the option by borrowing V_0 from the bank
         if self.position_type == "long":
-            V_t = -self.V_0 * torch.ones(self.batch_size)
+            V_t = -self.V_0 * torch.ones(self.batch_size, device=self.device)
         
         # If short, you recieve the premium that you put in the bank
         elif self.position_type == "short":
-            V_t = self.V_0 * torch.ones(self.batch_size)
+            V_t = self.V_0 * torch.ones(self.batch_size, device=self.device)
 
         # Unsqueeze to add a dimension at axis 0
         self.V_t_tensor = torch.unsqueeze(V_t, axis=0)
-        self.S_t_tensor = torch.unsqueeze(self.S_0 * torch.ones(self.batch_size), axis=0)
-        self.A_t_tensor = torch.unsqueeze(self.A_0 * torch.ones(self.batch_size), axis=0)
-        self.B_t_tensor = torch.unsqueeze(self.B_0 * torch.ones(self.batch_size), axis=0)
+        self.S_t_tensor = torch.unsqueeze(self.S_0 * torch.ones(self.batch_size, device=self.device), axis=0)
+        self.A_t_tensor = torch.unsqueeze(self.A_0 * torch.ones(self.batch_size, device=self.device), axis=0)
+        self.B_t_tensor = torch.unsqueeze(self.B_0 * torch.ones(self.batch_size, device=self.device), axis=0)
 
         # Processing stock price
         if self.prepro_stock == "log":
-            self.S_t = math.log(self.S_0) * torch.ones(self.batch_size)
+            self.S_t = math.log(self.S_0) * torch.ones(self.batch_size, device=self.device)
         elif self.prepro_stock == "log-moneyness":
-            self.S_t = math.log(self.S_0 / self.strike) * torch.ones(self.batch_size)
+            self.S_t = math.log(self.S_0 / self.strike) * torch.ones(self.batch_size, device=self.device)
         elif self.prepro_stock == "none":
-            self.S_t = self.S_0 * torch.ones(self.batch_size)
+            self.S_t = self.S_0 * torch.ones(self.batch_size, device=self.device)
 
-        A_t = self.A_0 * torch.ones(self.batch_size)
-        B_t = self.B_0 * torch.ones(self.batch_size)
+        A_t = self.A_0 * torch.ones(self.batch_size, device=self.device)
+        B_t = self.B_0 * torch.ones(self.batch_size, device=self.device)
 
         for t in range(self.N):
             # Construct feature vector at the beginning of time t
             # input_t[i, :] = [S_t, delta_t, V_t, A_t, B_t]
             # S_t ad V_t are normalized
             # input_t.shape = [batch_size, 6]
-            input_t = torch.stack((self.dt * t * torch.ones(self.batch_size), self.S_t, self.delta_t, V_t/self.V_0, A_t, B_t), dim=1)
+            input_t = torch.stack((self.dt * t * torch.ones(self.batch_size, device=self.device), self.S_t, self.delta_t, V_t/self.V_0, A_t, B_t), dim=1)
 
             # un-normalize price
             self.S_t = self.inverse_processing(self.S_t)
@@ -118,15 +119,8 @@ class DeepAgent():
             else:
                 self.input_t_tensor = torch.cat((self.input_t_tensor, torch.unsqueeze(input_t, dim=0)), dim=0)
 
+            # output of the model
             self.delta_t_next = self.model(input_t)
-   
-            # print(input_t)
-            # print(self.delta_t_next)
-
-            # if t == self.N-1:
-            #     delta_t_next = self.model(input_t)
-            # else:
-            #     delta_t_next = torch.unsqueeze(self.delta_t, dim=1)
 
             # Once the hedge is computed: 1) compile in self.strategy; 2) update M_t (cash reserve)
             if t == 0:
@@ -144,13 +138,13 @@ class DeepAgent():
             # Compute liquidity impact and persistence
             # For ask:
             if self.lambda_a == -1:
-                A_t = torch.zeros(self.batch_size)
+                A_t = torch.zeros(self.batch_size, device=self.device)
             else:
                 impact_ask = torch.where(diff_delta_t > 0, diff_delta_t, 0.0)
                 A_t = (A_t + impact_ask) * math.exp(-self.lambda_a * self.dt)
             # For bid:
             if self.lambda_b == -1:
-                B_t = torch.zeros(self.batch_size)
+                B_t = torch.zeros(self.batch_size, device=self.device)
             else:
                 impact_bid = torch.where(diff_delta_t < 0, -diff_delta_t, 0.0)
                 B_t = (B_t + impact_bid) * math.exp(-self.lambda_b * self.dt)
@@ -158,7 +152,7 @@ class DeepAgent():
             # Update features for next time step (market impact persistence already updated)
             # Update stock price
             if self.stock_dyn == "BSM":
-                Z = torch.randn(self.batch_size)
+                Z = torch.randn(self.batch_size, device=self.device)
                 self.S_t = self.S_t * torch.exp((self.mu - self.sigma ** 2 / 2) * self.dt + self.sigma * math.sqrt(self.dt) * Z)
 
             self.S_t_tensor = torch.cat((self.S_t_tensor, torch.unsqueeze(self.S_t, dim=0)), dim=0)
@@ -272,12 +266,14 @@ class DeepAgent():
 
     def train(self, train_size, epochs):
         start = dt.datetime.now()  # compute time
-        self.losses_epochs = np.ones(epochs)
+        self.losses_epochs = np.array([])
         best_loss = 99999999
         epoch = 0
         maxAt = np.array([])
         maxBt = np.array([])
-        
+        all_losses = np.array([])
+        early_stop = False
+
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
@@ -306,18 +302,19 @@ class DeepAgent():
                 # Take gradient step
                 self.optimizer.step()
                 
-                losses = np.append(losses, loss.detach().numpy())
-                hedging_error_train = np.append(hedging_error_train, hedging_error.detach().numpy())
-                exercised = np.append(exercised, self.condition.numpy())
-                strat = np.append(strat, np.mean(strategy.detach().numpy()))
-                maxAt = np.append(maxAt, np.max(A_t_tensor.detach().numpy()))
-                maxBt = np.append(maxBt, np.max(B_t_tensor.detach().numpy()))
+                all_losses = np.append(all_losses, loss.detach().cpu().numpy())
+                losses = np.append(losses, loss.detach().cpu().numpy())
+                hedging_error_train = np.append(hedging_error_train, hedging_error.detach().cpu().numpy())
+                exercised = np.append(exercised, self.condition.detach().cpu().numpy())
+                strat = np.append(strat, np.mean(strategy.detach().cpu().numpy()))
+                maxAt = np.append(maxAt, np.max(A_t_tensor.detach().cpu().numpy()))
+                maxBt = np.append(maxBt, np.max(B_t_tensor.detach().cpu().numpy()))
 
             # print("DELTA_T_NEXT: " , self.delta_t_next)
             # print("STRATEGY: ", strategy.detach().numpy()[:, 10, -1])
 
             # Store the training loss after each epoch
-            self.losses_epochs[epoch] = np.mean(losses)
+            self.losses_epochs = np.append(self.losses_epochs, np.mean(losses))
             # Print stats
             if (epoch + 1) % 1 == 0:
                 print("Time elapsed:", dt.datetime.now() - start)
@@ -328,11 +325,19 @@ class DeepAgent():
             # Save the model if it's better
             if self.losses_epochs[epoch] < best_loss:
                 best_loss = self.losses_epochs[epoch]
-                torch.save(self.model, "C:\\Users\\andrei\\Documents\\school\\grad\\y2\\code_tensorflow\\" + self.name)
+                torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
+
+            # Early stop after training on more epoch
+            if early_stop:
+                break
+
+            # Early stopping criteria
+            if epoch > 0 and self.losses_epochs[epoch] > best_loss:
+                early_stop = True
 
             epoch += 1
 
-        return self.losses_epochs
+        return all_losses, self.losses_epochs
     
     def test(self, test_size):
         hedging_err_pred = []
@@ -346,12 +351,12 @@ class DeepAgent():
             with torch.no_grad():
                 hedging_error, strategy, S_t_tensor, V_t_tensor, A_t_tensor, B_t_tensor = self.simulate_batch()
 
-                strategy_pred.append(strategy.detach().numpy())
-                hedging_err_pred.append(hedging_error.detach().numpy())
-                S_t_tensor_pred.append(S_t_tensor.detach().numpy())
-                V_t_tensor_pred.append(V_t_tensor.detach().numpy())
-                A_t_tensor_pred.append(A_t_tensor.detach().numpy())
-                B_t_tensor_pred.append(B_t_tensor.detach().numpy())
+                strategy_pred.append(strategy.detach().cpu().numpy())
+                hedging_err_pred.append(hedging_error.detach().cpu().numpy())
+                S_t_tensor_pred.append(S_t_tensor.detach().cpu().numpy())
+                V_t_tensor_pred.append(V_t_tensor.detach().cpu().numpy())
+                A_t_tensor_pred.append(A_t_tensor.detach().cpu().numpy())
+                B_t_tensor_pred.append(B_t_tensor.detach().cpu().numpy())
 
         return np.concatenate(strategy_pred, axis=1), np.concatenate(hedging_err_pred), np.concatenate(S_t_tensor_pred, axis=1), np.concatenate(V_t_tensor_pred, axis=1), np.concatenate(A_t_tensor_pred, axis=1), np.concatenate(B_t_tensor_pred, axis=1)
 

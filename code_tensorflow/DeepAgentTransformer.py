@@ -9,14 +9,14 @@ import Utils_general
 
 class Transformer(nn.Module):
     
-    def __init__(self, in_features, seq_length, d_model, n_heads, num_layers):
+    def __init__(self, in_features, seq_length, d_model, dim_feedforward, n_heads, num_layers):
         
         super().__init__()
 
         self.linear1 = nn.Linear(in_features=in_features, out_features=d_model)
         self.positional_encoding = nn.Parameter(torch.rand(seq_length, d_model))
         
-        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         
         self.final_linear = nn.Linear(in_features=d_model, out_features=1)
@@ -25,11 +25,11 @@ class Transformer(nn.Module):
         
         x = self.linear1(x)
         x = x + self.positional_encoding
-        self.transformer_encoder(x, src_key_padding_mask=src_key_padding_mask)
+        x = self.transformer_encoder(x, src_key_padding_mask=src_key_padding_mask)
         x = self.final_linear(x)
         x = torch.mean(x, dim=1)
         return x
-    
+
 class DeepAgent():
     
     def __init__(self, nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
@@ -64,8 +64,11 @@ class DeepAgent():
         self.lambda_b = lambdas[1]    #persistence parameter for the bid
         self.params_vect = params_vect
         self.strike = strike
-
-        self.model = Transformer(in_features=6, seq_length=self.N, d_model=30, n_heads=3, num_layers=2)
+        
+        # Device the computations will take place on
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # Model
+        self.model = Transformer(in_features=6, seq_length=self.N, d_model=128, dim_feedforward=256, n_heads=4, num_layers=3).to(self.device)
         
         self.name = name
         print("Initial value of the portfolio: ", V_0)
@@ -73,9 +76,10 @@ class DeepAgent():
     # Simulate a batch of paths and hedging errors
     def simulate_batch(self):
         
-        input_t_seq_mask = torch.ones(self.batch_size, self.N).type(torch.bool)
+        # padding mask that is passed to the transformer
+        input_t_seq_mask = torch.ones(self.batch_size, self.N, device=self.device).type(torch.bool)
 
-        self.delta_t = torch.zeros(self.batch_size) #number of shares at each time step
+        self.delta_t = torch.zeros(self.batch_size, device=self.device) #number of shares at each time step
         # Extract model parameters
         if self.stock_dyn == "BSM":
             self.mu, self.sigma = self.params_vect
@@ -83,44 +87,47 @@ class DeepAgent():
         # Portfolio value prior to trading at each time-step
         # If long, you buy the option by borrowing V_0 from the bank
         if self.position_type == "long":
-            V_t = -self.V_0 * torch.ones(self.batch_size)
+            V_t = -self.V_0 * torch.ones(self.batch_size, device=self.device)
         
         # If short, you recieve the premium that you put in the bank
         elif self.position_type == "short":
-            V_t = self.V_0 * torch.ones(self.batch_size)
+            V_t = self.V_0 * torch.ones(self.batch_size, device=self.device)
 
         # Unsqueeze to add a dimension at axis 0
         self.V_t_tensor = torch.unsqueeze(V_t, axis=0)
-        self.S_t_tensor = torch.unsqueeze(self.S_0 * torch.ones(self.batch_size), axis=0)
-        self.A_t_tensor = torch.unsqueeze(self.A_0 * torch.ones(self.batch_size), axis=0)
-        self.B_t_tensor = torch.unsqueeze(self.B_0 * torch.ones(self.batch_size), axis=0)
+        self.S_t_tensor = torch.unsqueeze(self.S_0 * torch.ones(self.batch_size, device=self.device), axis=0)
+        self.A_t_tensor = torch.unsqueeze(self.A_0 * torch.ones(self.batch_size, device=self.device), axis=0)
+        self.B_t_tensor = torch.unsqueeze(self.B_0 * torch.ones(self.batch_size, device=self.device), axis=0)
 
         # Processing stock price
         if self.prepro_stock == "log":
-            self.S_t = math.log(self.S_0) * torch.ones(self.batch_size)
+            self.S_t = math.log(self.S_0) * torch.ones(self.batch_size, device=self.device)
         elif self.prepro_stock == "log-moneyness":
-            self.S_t = math.log(self.S_0 / self.strike) * torch.ones(self.batch_size)
+            self.S_t = math.log(self.S_0 / self.strike) * torch.ones(self.batch_size, device=self.device)
         elif self.prepro_stock == "none":
-            self.S_t = self.S_0 * torch.ones(self.batch_size)
+            self.S_t = self.S_0 * torch.ones(self.batch_size, device=self.device)
 
-        A_t = self.A_0 * torch.ones(self.batch_size)
-        B_t = self.B_0 * torch.ones(self.batch_size)
+        A_t = self.A_0 * torch.ones(self.batch_size, device=self.device)
+        B_t = self.B_0 * torch.ones(self.batch_size, device=self.device)
 
         for t in range(self.N):
             # Construct feature vector at the beginning of time t
             # input_t[i, :] = [S_t, delta_t, V_t, A_t, B_t]
             # S_t ad V_t are normalized
             # input_t.shape = [batch_size, 6]
-            input_t = torch.stack((self.dt * t * torch.ones(self.batch_size), self.S_t, self.delta_t, V_t/self.V_0, A_t, B_t), dim=1)
+            input_t = torch.stack((self.dt * t * torch.ones(self.batch_size, device=self.device), self.S_t, self.delta_t, V_t/self.V_0, A_t, B_t), dim=1)
             
+            # input without the padding
             if t == 0:
                 input_t_concat = input_t.unsqueeze(dim=1)
             else:
                 input_t_concat = torch.cat((input_t_concat, input_t.unsqueeze(dim=1)), dim=1)
-            padding = torch.zeros(self.batch_size, self.N-(t+1), 6)
+            padding = torch.zeros(self.batch_size, self.N-(t+1), 6, device=self.device)
+            # input sequence with the padding passed to the transformer
             input_t_seq = torch.cat((input_t_concat, padding), dim=1)
+            # Update padding mask
             input_t_seq_mask[:, t] = False
-
+            
             # un-normalize price
             self.S_t = self.inverse_processing(self.S_t)
             
@@ -130,15 +137,8 @@ class DeepAgent():
             else:
                 self.input_t_tensor = torch.cat((self.input_t_tensor, torch.unsqueeze(input_t, dim=0)), dim=0)
 
+            # Output of the model
             self.delta_t_next = self.model(input_t_seq, input_t_seq_mask)
-
-            # print(input_t)
-            # print(self.delta_t_next)
-
-            # if t == self.N-1:
-            #     delta_t_next = self.model(input_t)
-            # else:
-            #     delta_t_next = torch.unsqueeze(self.delta_t, dim=1)
 
             # Once the hedge is computed: 1) compile in self.strategy; 2) update M_t (cash reserve)
             if t == 0:
@@ -156,13 +156,13 @@ class DeepAgent():
             # Compute liquidity impact and persistence
             # For ask:
             if self.lambda_a == -1:
-                A_t = torch.zeros(self.batch_size)
+                A_t = torch.zeros(self.batch_size, device=self.device)
             else:
                 impact_ask = torch.where(diff_delta_t > 0, diff_delta_t, 0.0)
                 A_t = (A_t + impact_ask) * math.exp(-self.lambda_a * self.dt)
             # For bid:
             if self.lambda_b == -1:
-                B_t = torch.zeros(self.batch_size)
+                B_t = torch.zeros(self.batch_size, device=self.device)
             else:
                 impact_bid = torch.where(diff_delta_t < 0, -diff_delta_t, 0.0)
                 B_t = (B_t + impact_bid) * math.exp(-self.lambda_b * self.dt)
@@ -170,7 +170,7 @@ class DeepAgent():
             # Update features for next time step (market impact persistence already updated)
             # Update stock price
             if self.stock_dyn == "BSM":
-                Z = torch.randn(self.batch_size)
+                Z = torch.randn(self.batch_size, device=self.device)
                 self.S_t = self.S_t * torch.exp((self.mu - self.sigma ** 2 / 2) * self.dt + self.sigma * math.sqrt(self.dt) * Z)
 
             self.S_t_tensor = torch.cat((self.S_t_tensor, torch.unsqueeze(self.S_t, dim=0)), dim=0)
@@ -271,25 +271,27 @@ class DeepAgent():
         return F.relu(x) * (1 + self.r_lend) ** self.dt - F.relu(-x) * (1 + self.r_borrow) ** self.dt
 
     # Returns the loss computed on the hedging errors
-    def loss(self):
+    def loss(self, hedging_error):
         if self.loss_type == "RMSE":
-            loss = torch.sqrt(torch.mean(torch.square(self.hedging_error)))
+            loss = torch.sqrt(torch.mean(torch.square(hedging_error)))
         elif self.loss_type == "RMSE per share":
-            loss = torch.sqrt(torch.mean(torch.square(self.hedging_error))) / self.nbs_shares
+            loss = torch.sqrt(torch.mean(torch.square(hedging_error))) / self.nbs_shares
         elif self.loss_type == "RSMSE":
-            loss = torch.sqrt(torch.mean(torch.square(torch.where(self.hedging_error > 0, self.hedging_error, 0))))
+            loss = torch.sqrt(torch.mean(torch.square(torch.where(hedging_error > 0, hedging_error, 0))))
         elif self.loss_type == "RSMSE per share":
-            loss = torch.sqrt(torch.mean(torch.square(torch.where(self.hedging_error > 0, self.hedging_error, 0)))) / self.nbs_shares
+            loss = torch.sqrt(torch.mean(torch.square(torch.where(hedging_error > 0, hedging_error, 0)))) / self.nbs_shares
         return loss
 
     def train(self, train_size, epochs):
         start = dt.datetime.now()  # compute time
-        self.losses_epochs = np.ones(epochs)
+        self.losses_epochs = np.array([])
         best_loss = 99999999
         epoch = 0
         maxAt = np.array([])
         maxBt = np.array([])
-        
+        all_losses = np.array([])
+        early_stop = False
+
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
@@ -302,15 +304,16 @@ class DeepAgent():
 
             # mini batch training
             for i in range(int(train_size/self.batch_size)):
-                print("BATCH: " + str(i) + "/" + str(int(train_size/self.batch_size)))
+                if i % 100 == 0:
+                    print("BATCH: " + str(i) + "/" + str(int(train_size/self.batch_size)))
                 # Zero out gradients
                 self.optimizer.zero_grad()
 
                 # Simulate batch
                 hedging_error, strategy, S_t_tensor, V_t_tensor, A_t_tensor, B_t_tensor = self.simulate_batch()
-                
+
                 # Compute and backprop loss
-                loss = self.loss()
+                loss = self.loss(hedging_error)
                 loss.backward()
 
                 # print(self.S_t_tensor.grad)
@@ -318,33 +321,42 @@ class DeepAgent():
                 # Take gradient step
                 self.optimizer.step()
                 
-                losses = np.append(losses, loss.detach().numpy())
-                hedging_error_train = np.append(hedging_error_train, hedging_error.detach().numpy())
-                exercised = np.append(exercised, self.condition.numpy())
-                strat = np.append(strat, np.mean(strategy.detach().numpy()))
-                maxAt = np.append(maxAt, np.max(A_t_tensor.detach().numpy()))
-                maxBt = np.append(maxBt, np.max(B_t_tensor.detach().numpy()))
+                all_losses = np.append(all_losses, loss.detach().cpu().numpy())
+                losses = np.append(losses, loss.detach().cpu().numpy())
+                hedging_error_train = np.append(hedging_error_train, hedging_error.detach().cpu().numpy())
+                exercised = np.append(exercised, self.condition.detach().cpu().numpy())
+                strat = np.append(strat, np.mean(strategy.detach().cpu().numpy()))
+                maxAt = np.append(maxAt, np.max(A_t_tensor.detach().cpu().numpy()))
+                maxBt = np.append(maxBt, np.max(B_t_tensor.detach().cpu().numpy()))
 
             # print("DELTA_T_NEXT: " , self.delta_t_next)
             # print("STRATEGY: ", strategy.detach().numpy()[:, 10, -1])
 
             # Store the training loss after each epoch
-            self.losses_epochs[epoch] = np.mean(losses)
+            self.losses_epochs = np.append(self.losses_epochs, np.mean(losses))
             # Print stats
             if (epoch + 1) % 1 == 0:
                 print("Time elapsed:", dt.datetime.now() - start)
                 print("Epoch: %d, %s, Train Loss: %.3f" % (epoch + 1, self.loss_type, self.losses_epochs[epoch]))
                 print("Proportion of exercise: ", np.mean(exercised))
                 print("Strike: ", self.strike)
-
+            
             # Save the model if it's better
             if self.losses_epochs[epoch] < best_loss:
                 best_loss = self.losses_epochs[epoch]
-                torch.save(self.model, "C:\\Users\\andrei\\Documents\\school\\grad\\y2\\code_tensorflow\\" + self.name)
+                torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
+            
+            # Early stop after training on more epoch
+            if early_stop:
+                break
+
+            # Early stopping criteria
+            if epoch > 0 and self.losses_epochs[epoch] > best_loss:
+                early_stop = True
 
             epoch += 1
-
-        return self.losses_epochs
+        
+        return all_losses, self.losses_epochs
     
     def test(self, test_size):
         hedging_err_pred = []
@@ -358,12 +370,12 @@ class DeepAgent():
             with torch.no_grad():
                 hedging_error, strategy, S_t_tensor, V_t_tensor, A_t_tensor, B_t_tensor = self.simulate_batch()
 
-                strategy_pred.append(strategy.detach().numpy())
-                hedging_err_pred.append(hedging_error.detach().numpy())
-                S_t_tensor_pred.append(S_t_tensor.detach().numpy())
-                V_t_tensor_pred.append(V_t_tensor.detach().numpy())
-                A_t_tensor_pred.append(A_t_tensor.detach().numpy())
-                B_t_tensor_pred.append(B_t_tensor.detach().numpy())
+                strategy_pred.append(strategy.detach().cpu().numpy())
+                hedging_err_pred.append(hedging_error.detach().cpu().numpy())
+                S_t_tensor_pred.append(S_t_tensor.detach().cpu().numpy())
+                V_t_tensor_pred.append(V_t_tensor.detach().cpu().numpy())
+                A_t_tensor_pred.append(A_t_tensor.detach().cpu().numpy())
+                B_t_tensor_pred.append(B_t_tensor.detach().cpu().numpy())
 
         return np.concatenate(strategy_pred, axis=1), np.concatenate(hedging_err_pred), np.concatenate(S_t_tensor_pred, axis=1), np.concatenate(V_t_tensor_pred, axis=1), np.concatenate(A_t_tensor_pred, axis=1), np.concatenate(B_t_tensor_pred, axis=1)
 
