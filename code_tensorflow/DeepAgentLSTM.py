@@ -9,7 +9,7 @@ import Utils_general
 
 class LSTM_multilayer_cell(nn.Module):
     
-    def __init__(self, input_size, hidden_size, num_layers):
+    def __init__(self, batch_size, input_size, hidden_size, num_layers, device):
         
         super().__init__()
 
@@ -19,18 +19,27 @@ class LSTM_multilayer_cell(nn.Module):
         
         self.linear = nn.Linear(in_features=hidden_size, out_features=1)
 
+        self.batch_size = batch_size
+        self.nbs_units = hidden_size
+        self.device = device
         self.num_layers = num_layers
+
+    # def init_hidden_state(self):
+    #     return [torch.zeros(self.batch_size, self.nbs_units, device=self.device) for i in range(self.num_layers)]
+    
+    # def init_cell_state(self):
+    #     return [torch.zeros(self.batch_size, self.nbs_units, device=self.device) for i in range(self.num_layers)]
 
     def forward(self, x, hs, cs):
         
         hs[0], cs[0] = self.first_lstm_cell(x, (hs[0], cs[0]))
         if self.num_layers > 1:
-            for i in range(self.num_layers-2):
+            for i in range(self.num_layers-1):
                 hs[i+1], cs[i+1] = self.lstm_cells[i](hs[i], (hs[i+1], cs[i+1]))
             x = self.linear(hs[i+1])
         else:
             x = self.linear(hs[0])
-        return x
+        return x, hs, cs
 
 class DeepAgent():
     
@@ -70,7 +79,7 @@ class DeepAgent():
         # Device the computations will take place on
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Model
-        self.model = LSTM_multilayer_cell(input_size=6, hidden_size=self.nbs_units, num_layers=self.nbs_layers).to(self.device)
+        self.model = LSTM_multilayer_cell(batch_size=self.batch_size, input_size=6, hidden_size=self.nbs_units, num_layers=self.nbs_layers, device=self.device).to(self.device)
 
         self.name = name
         print("Initial value of the portfolio: ", V_0)
@@ -78,8 +87,8 @@ class DeepAgent():
     # Simulate a batch of paths and hedging errors
     def simulate_batch(self):
 
-        self.hs = [torch.randn(self.batch_size, self.nbs_units, device=self.device) for i in range(self.num_layers)]
-        self.cs = [torch.randn(self.batch_size, self.nbs_units, device=self.device) for i in range(self.num_layers)]
+        hs = [torch.zeros(self.batch_size, self.nbs_units, device=self.device) for i in range(self.nbs_layers)]
+        cs = [torch.zeros(self.batch_size, self.nbs_units, device=self.device) for i in range(self.nbs_layers)]
 
         self.delta_t = torch.zeros(self.batch_size, device=self.device) #number of shares at each time step
         # Extract model parameters
@@ -129,7 +138,7 @@ class DeepAgent():
                 self.input_t_tensor = torch.cat((self.input_t_tensor, torch.unsqueeze(input_t, dim=0)), dim=0)
 
             # Output of the model
-            self.delta_t_next = self.model(input_t, self.hs, self.cs)
+            self.delta_t_next, hs, cs = self.model(input_t, hs, cs)
 
             # Once the hedge is computed: 1) compile in self.strategy; 2) update M_t (cash reserve)
             if t == 0:
@@ -213,9 +222,6 @@ class DeepAgent():
                                                 self.M_t + self.liquid_func(self.S_t, self.delta_t, A_t, B_t))
         self.hedging_error = -self.hedging_gain
         
-        # print("HEDGING ERROR SHAPE: ", self.hedging_error.shape)
-        # print("HEDGING ERROR: ", self.hedging_error)
-
         return self.hedging_error, self.strategy, self.S_t_tensor, self.V_t_tensor, self.A_t_tensor, self.B_t_tensor
 
     # Reverse the processing of the stock price
@@ -281,6 +287,7 @@ class DeepAgent():
         maxAt = np.array([])
         maxBt = np.array([])
         all_losses = np.array([])
+        worse_loss = 0
         early_stop = False
 
         # Initialize optimizer
@@ -292,6 +299,8 @@ class DeepAgent():
             strat = np.array([])
             exercised = np.array([])
             losses = np.array([])
+            # hs = self.model.init_hidden_state()
+            # cs = self.model.init_cell_state()
 
             # mini batch training
             for i in range(int(train_size/self.batch_size)):
@@ -307,6 +316,8 @@ class DeepAgent():
                 loss = self.loss(hedging_error)
                 loss.backward()
 
+                # hs = [h.detach() for h in hs]
+                # cs = [c.detach() for c in cs]
                 # print(self.S_t_tensor.grad)
 
                 # Take gradient step
@@ -337,13 +348,15 @@ class DeepAgent():
                 best_loss = self.losses_epochs[epoch]
                 torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
             
-            # Early stop after training on more epoch
-            if early_stop:
-                break
+            # # Early stop after training on more epoch
+            # if early_stop:
+            #     break
 
-            # Early stopping criteria
-            if epoch > 0 and self.losses_epochs[epoch] > best_loss:
-                early_stop = True
+            # # Early stopping criteria
+            # if self.losses_epochs[epoch] > best_loss:
+            #     worse_loss += 1
+            #     if worse_loss == 2:
+            #         early_stop = True
 
             epoch += 1
         
@@ -356,6 +369,8 @@ class DeepAgent():
         V_t_tensor_pred = []
         A_t_tensor_pred = []
         B_t_tensor_pred = []
+        # hs = self.model.init_hidden_state()
+        # cs = self.model.init_cell_state()
 
         for i in range(int(test_size/self.batch_size)):
             with torch.no_grad():

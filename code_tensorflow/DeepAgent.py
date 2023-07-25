@@ -272,6 +272,7 @@ class DeepAgent():
         maxAt = np.array([])
         maxBt = np.array([])
         all_losses = np.array([])
+        worse_loss = 0
         early_stop = False
 
         # Initialize optimizer
@@ -327,13 +328,15 @@ class DeepAgent():
                 best_loss = self.losses_epochs[epoch]
                 torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
 
-            # Early stop after training on more epoch
-            if early_stop:
-                break
+            # # Early stop after training on more epoch
+            # if early_stop:
+            #     break
 
-            # Early stopping criteria
-            if epoch > 0 and self.losses_epochs[epoch] > best_loss:
-                early_stop = True
+            # # Early stopping criteria
+            # if self.losses_epochs[epoch] > best_loss:
+            #     worse_loss += 1
+            #     if worse_loss == 2:
+            #         early_stop = True
 
             epoch += 1
 

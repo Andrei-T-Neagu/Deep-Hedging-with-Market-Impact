@@ -68,7 +68,7 @@ class DeepAgent():
         # Device the computations will take place on
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Model
-        self.model = Transformer(in_features=6, seq_length=self.N, d_model=128, dim_feedforward=256, n_heads=4, num_layers=3).to(self.device)
+        self.model = Transformer(in_features=6, seq_length=self.N, d_model=self.nbs_units, dim_feedforward=self.nbs_units, n_heads=4, num_layers=self.nbs_layers).to(self.device)
         
         self.name = name
         print("Initial value of the portfolio: ", V_0)
@@ -290,6 +290,7 @@ class DeepAgent():
         maxAt = np.array([])
         maxBt = np.array([])
         all_losses = np.array([])
+        worse_loss = 0
         early_stop = False
 
         # Initialize optimizer
@@ -346,13 +347,15 @@ class DeepAgent():
                 best_loss = self.losses_epochs[epoch]
                 torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
             
-            # Early stop after training on more epoch
-            if early_stop:
-                break
+            # # Early stop after training on more epoch
+            # if early_stop:
+            #     break
 
-            # Early stopping criteria
-            if epoch > 0 and self.losses_epochs[epoch] > best_loss:
-                early_stop = True
+            # # Early stopping criteria
+            # if self.losses_epochs[epoch] > best_loss:
+            #     worse_loss += 1
+            #     if worse_loss == 2:
+            #         early_stop = True
 
             epoch += 1
         

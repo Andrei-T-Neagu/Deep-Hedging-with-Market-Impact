@@ -79,11 +79,12 @@ def print_stats(hedging_err, deltas, loss_type, model_name, V_0, riskaversion=99
 
     # 2) Print out everything
     # if (output):
-        # plt.hist(hedging_err, bins=50)
-        # plt.xlabel('Hedging error')
-        # plt.ylabel('Frequency')
-        # plt.title('%s' % (model_name))
-        # plt.savefig('%s.png' % (model_name))
+    #     fig = plt.figure(figsize=(10, 5))
+    #     plt.hist(hedging_err, bins=50)
+    #     plt.xlabel('Hedging error')
+    #     plt.ylabel('Frequency')
+    #     plt.title('%s' % (model_name))
+    #     plt.savefig('%s.png' % (model_name))
 
     if (loss_type == "CVaR" or loss_type == "CVaR_per_share"):
         loss = np.mean(np.sort(hedging_err)[int(riskaversion * hedging_err.shape[0]):])
