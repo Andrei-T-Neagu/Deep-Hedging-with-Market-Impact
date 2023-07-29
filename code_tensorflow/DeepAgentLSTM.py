@@ -85,7 +85,7 @@ class DeepAgent():
         print("Initial value of the portfolio: ", V_0)
 
     # Simulate a batch of paths and hedging errors
-    def simulate_batch(self):
+    def simulate_batch(self, test_path=None):
 
         hs = [torch.zeros(self.batch_size, self.nbs_units, device=self.device) for i in range(self.nbs_layers)]
         cs = [torch.zeros(self.batch_size, self.nbs_units, device=self.device) for i in range(self.nbs_layers)]
@@ -169,9 +169,12 @@ class DeepAgent():
 
             # Update features for next time step (market impact persistence already updated)
             # Update stock price
-            if self.stock_dyn == "BSM":
-                Z = torch.randn(self.batch_size, device=self.device)
-                self.S_t = self.S_t * torch.exp((self.mu - self.sigma ** 2 / 2) * self.dt + self.sigma * math.sqrt(self.dt) * Z)
+            if test_path is not None:
+                self.S_t = test_path[t]
+            else:
+                if self.stock_dyn == "BSM":
+                    Z = torch.randn(self.batch_size, device=self.device)
+                    self.S_t = self.S_t * torch.exp((self.mu - self.sigma ** 2 / 2) * self.dt + self.sigma * math.sqrt(self.dt) * Z)
 
             self.S_t_tensor = torch.cat((self.S_t_tensor, torch.unsqueeze(self.S_t, dim=0)), dim=0)
             self.delta_t = self.strategy[t, :, 0]
@@ -362,19 +365,19 @@ class DeepAgent():
         
         return all_losses, self.losses_epochs
     
-    def test(self, test_size):
+    def test(self, test_size, test_set):
         hedging_err_pred = []
         strategy_pred = []
         S_t_tensor_pred = []
         V_t_tensor_pred = []
         A_t_tensor_pred = []
         B_t_tensor_pred = []
-        # hs = self.model.init_hidden_state()
-        # cs = self.model.init_cell_state()
 
         for i in range(int(test_size/self.batch_size)):
             with torch.no_grad():
-                hedging_error, strategy, S_t_tensor, V_t_tensor, A_t_tensor, B_t_tensor = self.simulate_batch()
+                
+                test_path = test_set[i]
+                hedging_error, strategy, S_t_tensor, V_t_tensor, A_t_tensor, B_t_tensor = self.simulate_batch(test_path)
 
                 strategy_pred.append(strategy.detach().cpu().numpy())
                 hedging_err_pred.append(hedging_error.detach().cpu().numpy())
