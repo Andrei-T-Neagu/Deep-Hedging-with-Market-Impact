@@ -16,7 +16,7 @@ nbs_point_traj = 31
 batch_size = 256
 train_size = 100000
 test_size = 200000
-epochs = 1
+epochs = 20
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
@@ -30,14 +30,15 @@ option_type = "call"
 position_type = "short"
 strike = 1000
 nbs_layers = 3
-nbs_units = 256
+nbs_units = 64
 lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
 lambdas = [1, 1]
-seed = 0
+
 name_ffnn = 'ffnn_model'
 name_lstm = 'lstm_model'
+name_gru = 'gru_model'
 name_transformer = 'transformer_model'
 
 if (option_type == 'Call'):
@@ -46,6 +47,7 @@ else:
     V_0 = Utils_general.BlackScholes_price(S_0, T, r_borrow, params_vect[1], strike, -1)
 
 
+# Creating test dataset
 mu, sigma = params_vect
 N = nbs_point_traj - 1
 dt = T / N
@@ -58,6 +60,7 @@ for i in range(int(test_size/batch_size)):
         S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
         test_set[i, j, :] = S_t
 
+
 agent_trans = DeepAgentTransformer.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
                  nbs_shares, lambdas, name=name_transformer)
@@ -68,6 +71,7 @@ print("DONE TRANSFORMER")
 agent_trans.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_transformer)
 deltas_trans, hedging_err_trans, S_t_trans, V_t_trans, A_t_trans, B_t_trans, = agent_trans.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_trans = np.square(np.where(hedging_err_trans > 0, hedging_err_trans, 0))
+
 
 agent_lstm = DeepAgentLSTM.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
@@ -80,6 +84,19 @@ agent_lstm.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + 
 deltas_lstm, hedging_err_lstm, S_t_lstm, V_t_lstm, A_t_lstm, B_t_lstm, = agent_lstm.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_lstm = np.square(np.where(hedging_err_lstm > 0, hedging_err_lstm, 0))
 
+
+agent_gru = DeepAgentGRU.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
+                 loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
+                 nbs_shares, lambdas, name=name_gru)
+
+print("START GRU")
+all_losses_gru, gru_losses = agent_gru.train(train_size = train_size, epochs=epochs)
+print("DONE GRU")
+agent_gru.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_gru)
+deltas_gru, hedging_err_gru, S_t_gru, V_t_gru, A_t_gru, B_t_gru, = agent_gru.test(test_size=test_size, test_set=test_set)
+semi_square_hedging_err_gru = np.square(np.where(hedging_err_gru > 0, hedging_err_gru, 0))
+
+
 agent = DeepAgent.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
                  nbs_shares, lambdas, name=name_ffnn)
@@ -91,10 +108,16 @@ agent.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_
 deltas_ffnn, hedging_err_ffnn, S_t_ffnn, V_t_ffnn, A_t_ffnn, B_t_ffnn, = agent.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_ffnn = np.square(np.where(hedging_err_ffnn > 0, hedging_err_ffnn, 0))
 
+
 print(" ----------------- ")
 print(" Deep Hedging %s TRANSFORMER Results" % (loss_type))
 print(" ----------------- ")
 Utils_general.print_stats(hedging_err_trans, deltas_trans, loss_type, "Deep hedge - TRANSFORMER - %s" % (loss_type), V_0)
+
+print(" ----------------- ")
+print(" Deep Hedging %s GRU Results" % (loss_type))
+print(" ----------------- ")
+Utils_general.print_stats(hedging_err_gru, deltas_gru, loss_type, "Deep hedge - GRU - %s" % (loss_type), V_0)
 
 print(" ----------------- ")
 print(" Deep Hedging %s LSTM Results" % (loss_type))
@@ -113,74 +136,102 @@ deltas_DH, hedging_err_DH = Utils_general.delta_hedge_res(S_t_ffnn, r_borrow, r_
 Utils_general.print_stats(hedging_err_DH, deltas_DH, "Delta hedge", "Delta hedge", V_0)
 semi_square_hedging_err_DH = np.square(np.where(hedging_err_DH > 0, hedging_err_DH, 0))
 
-print("TRANSFORMER S_T: ", S_t_trans[-1])
-print("LSTM S_T: ", S_t_lstm[-1])
-print("FFNN S_T: ", S_t_ffnn[-1])
+print()
 
-print(" ----------------- ")
-print(" t-test for (SMSE Transformer < SMSE lstm)")
-print(" ----------------- ")
-print(ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_lstm, equal_var=False, alternative="less"))
+smse_trans_trans = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
+smse_trans_gru = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
+smse_trans_lstm = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
+smse_trans_ffnn = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+smse_trans_DH = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (mean Transformer < mean lstm)")
-print(" ----------------- ")
-print(ttest_ind(hedging_err_trans, hedging_err_lstm, equal_var=False, alternative="less"))
+smse_gru_trans = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
+smse_gru_gru = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
+smse_gru_lstm = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
+smse_gru_ffnn = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+smse_gru_DH = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (SMSE Transformer < SMSE ffnn)")
-print(" ----------------- ")
-print(ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_ffnn, equal_var=False, alternative="less"))
+smse_lstm_trans = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
+smse_lstm_gru = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
+smse_lstm_lstm = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
+smse_lstm_ffnn = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+smse_lstm_DH = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (mean Transformer < mean ffnn)")
-print(" ----------------- ")
-print(ttest_ind(hedging_err_trans, hedging_err_ffnn, equal_var=False, alternative="less"))
+smse_ffnn_trans = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
+smse_ffnn_gru = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
+smse_ffnn_lstm = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
+smse_ffnn_ffnn = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+smse_ffnn_DH = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (SMSE lstm < SMSE FFNN)")
-print(" ----------------- ")
-print(ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_ffnn, equal_var=False, alternative="less"))
+smse_DH_trans = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
+smse_DH_gru = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
+smse_DH_lstm = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
+smse_DH_ffnn = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+smse_DH_DH = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (mean lstm < mean FFNN)")
-print(" ----------------- ")
-print(ttest_ind(hedging_err_lstm, hedging_err_ffnn, equal_var=False, alternative="less"))
+print("|------------------------------------------------T-Test for Smaller SMSE------------------------------------------------|")
+print("|\t\t\t|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|")
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tTransformer\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_trans_trans, smse_trans_gru, smse_trans_lstm, smse_trans_ffnn, smse_trans_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tGRU\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_gru_trans, smse_gru_gru, smse_gru_lstm, smse_gru_ffnn, smse_gru_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tLSTM\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_lstm_trans, smse_lstm_gru, smse_lstm_lstm, smse_lstm_ffnn, smse_lstm_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_ffnn_trans, smse_ffnn_gru, smse_ffnn_lstm, smse_ffnn_ffnn, smse_ffnn_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH))
 
-print(" ----------------- ")
-print(" t-test for (SMSE transformer < SMSE delta-hedge)")
-print(" ----------------- ")
-print(ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_DH, equal_var=False, alternative="less"))
+print()
 
-print(" ----------------- ")
-print(" t-test for (mean transformer < mean delta-hedge)")
-print(" ----------------- ")
-print(ttest_ind(hedging_err_trans, hedging_err_DH, equal_var=False, alternative="less"))
+mean_trans_trans = ttest_ind(hedging_err_trans, hedging_err_trans, equal_var=False, alternative="less").pvalue
+mean_trans_gru = ttest_ind(hedging_err_trans, hedging_err_gru, equal_var=False, alternative="less").pvalue
+mean_trans_lstm = ttest_ind(hedging_err_trans, hedging_err_lstm, equal_var=False, alternative="less").pvalue
+mean_trans_ffnn = ttest_ind(hedging_err_trans, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+mean_trans_DH = ttest_ind(hedging_err_trans, hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (SMSE lstm < SMSE delta-hedge)")
-print(" ----------------- ")
-print(ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_DH, equal_var=False, alternative="less"))
+mean_gru_trans = ttest_ind(hedging_err_gru, hedging_err_trans, equal_var=False, alternative="less").pvalue
+mean_gru_gru = ttest_ind(hedging_err_gru, hedging_err_gru, equal_var=False, alternative="less").pvalue
+mean_gru_lstm = ttest_ind(hedging_err_gru, hedging_err_lstm, equal_var=False, alternative="less").pvalue
+mean_gru_ffnn = ttest_ind(hedging_err_gru, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+mean_gru_DH = ttest_ind(hedging_err_gru, hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (mean lstm < mean delta-hedge)")
-print(" ----------------- ")
-print(ttest_ind(hedging_err_lstm, hedging_err_DH, equal_var=False, alternative="less"))
+mean_lstm_trans = ttest_ind(hedging_err_lstm, hedging_err_trans, equal_var=False, alternative="less").pvalue
+mean_lstm_gru = ttest_ind(hedging_err_lstm, hedging_err_gru, equal_var=False, alternative="less").pvalue
+mean_lstm_lstm = ttest_ind(hedging_err_lstm, hedging_err_lstm, equal_var=False, alternative="less").pvalue
+mean_lstm_ffnn = ttest_ind(hedging_err_lstm, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+mean_lstm_DH = ttest_ind(hedging_err_lstm, hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (SMSE FFNN < SMSE delta-hedge)")
-print(" ----------------- ")
-print(ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_DH, equal_var=False, alternative="less"))
+mean_ffnn_trans = ttest_ind(hedging_err_ffnn, hedging_err_trans, equal_var=False, alternative="less").pvalue
+mean_ffnn_gru = ttest_ind(hedging_err_ffnn, hedging_err_gru, equal_var=False, alternative="less").pvalue
+mean_ffnn_lstm = ttest_ind(hedging_err_ffnn, hedging_err_lstm, equal_var=False, alternative="less").pvalue
+mean_ffnn_ffnn = ttest_ind(hedging_err_ffnn, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+mean_ffnn_DH = ttest_ind(hedging_err_ffnn, hedging_err_DH, equal_var=False, alternative="less").pvalue
 
-print(" ----------------- ")
-print(" t-test for (mean FFNN < mean delta-hedge)")
-print(" ----------------- ")
-print(ttest_ind(hedging_err_ffnn, hedging_err_DH, equal_var=False, alternative="less"))
+mean_DH_trans = ttest_ind(hedging_err_DH, hedging_err_trans, equal_var=False, alternative="less").pvalue
+mean_DH_gru = ttest_ind(hedging_err_DH, hedging_err_gru, equal_var=False, alternative="less").pvalue
+mean_DH_lstm = ttest_ind(hedging_err_DH, hedging_err_lstm, equal_var=False, alternative="less").pvalue
+mean_DH_ffnn = ttest_ind(hedging_err_DH, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+mean_DH_DH = ttest_ind(hedging_err_DH, hedging_err_DH, equal_var=False, alternative="less").pvalue
+
+print("|-----------------------------------------T-Test for Smaller Mean Hedging Error-----------------------------------------|")
+print("|\t\t\t|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|")
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tTransformer\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_trans_trans, mean_trans_gru, mean_trans_lstm, mean_trans_ffnn, mean_trans_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tGRU\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_gru_trans, mean_gru_gru, mean_gru_lstm, mean_gru_ffnn, mean_gru_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tLSTM\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_lstm_trans, mean_lstm_gru, mean_lstm_lstm, mean_lstm_ffnn, mean_lstm_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_ffnn_trans, mean_ffnn_gru, mean_ffnn_lstm, mean_ffnn_ffnn, mean_ffnn_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH))
+
 
 all_losses_fig = plt.figure(figsize=(10, 5))
 plt.plot(all_losses_lstm, label="LSTM")
 plt.plot(all_losses_ffnn, label="FFNN")
 plt.plot(all_losses_trans, label="Transformer")
+plt.plot(all_losses_gru, label="GRU")
 plt.legend()
 plt.savefig("all_losses" + str(nbs_point_traj) + ".png")
 
@@ -188,8 +239,33 @@ epoch_losses_fig = plt.figure(figsize=(10, 5))
 plt.plot(lstm_losses, label="LSTM")
 plt.plot(ffnn_losses, label="FFNN")
 plt.plot(trans_losses, label="Transformer")
+plt.plot(gru_losses, label="GRU")
 plt.legend()
 plt.savefig("epoch_losses" + str(nbs_point_traj) + ".png")
+
+fig = plt.figure(figsize=(10, 5))
+plt.hist([hedging_err_gru, hedging_err_trans], bins=50, label=["GRU", "Transformer"])
+plt.xlabel('Hedging error')
+plt.ylabel('Frequency')
+plt.legend()
+plt.title("Hedging errors for GRU / Transformer - " + str(nbs_point_traj))
+plt.savefig("Hedging_Errors_GRU_Transformer" + str(nbs_point_traj) + ".png")
+
+fig = plt.figure(figsize=(10, 5))
+plt.hist([hedging_err_gru, hedging_err_lstm], bins=50, label=["GRU", "LSTM"])
+plt.xlabel('Hedging error')
+plt.ylabel('Frequency')
+plt.legend()
+plt.title("Hedging errors for GRU / LSTM - " + str(nbs_point_traj))
+plt.savefig("Hedging_Errors_GRU_LSTM" + str(nbs_point_traj) + ".png")
+
+fig = plt.figure(figsize=(10, 5))
+plt.hist([hedging_err_gru, hedging_err_ffnn], bins=50, label=["GRU", "FFNN"])
+plt.xlabel('Hedging error')
+plt.ylabel('Frequency')
+plt.legend()
+plt.title("Hedging errors for GRU / FFNN - " + str(nbs_point_traj))
+plt.savefig("Hedging_Errors_GRU_FFNN" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_lstm, hedging_err_trans], bins=50, label=["LSTM", "Transformer"])
