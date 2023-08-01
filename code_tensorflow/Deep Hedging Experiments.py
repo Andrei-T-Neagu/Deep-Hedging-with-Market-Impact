@@ -16,25 +16,25 @@ nbs_point_traj = 31
 batch_size = 256
 train_size = 100000
 test_size = 200000
-epochs = 20
+epochs = 10
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
 params_vect = [0.1, 0.1898]
 S_0 = 1000
 T = 30/252
-alpha = 1.05
-beta = 0.95
+alpha = 1.0
+beta = 1.0
 loss_type = "RSMSE"
 option_type = "call"
 position_type = "short"
 strike = 1000
-nbs_layers = 3
-nbs_units = 64
+nbs_layers = 5
+nbs_units = 128
 lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
-lambdas = [1, 1]
+lambdas = [-1, -1]
 
 name_ffnn = 'ffnn_model'
 name_lstm = 'lstm_model'
@@ -45,7 +45,6 @@ if (option_type == 'Call'):
     V_0 = Utils_general.BlackScholes_price(S_0, T, r_borrow, params_vect[1], strike, 1)
 else:
     V_0 = Utils_general.BlackScholes_price(S_0, T, r_borrow, params_vect[1], strike, -1)
-
 
 # Creating test dataset
 mu, sigma = params_vect
@@ -71,7 +70,7 @@ print("DONE TRANSFORMER")
 agent_trans.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_transformer)
 deltas_trans, hedging_err_trans, S_t_trans, V_t_trans, A_t_trans, B_t_trans, = agent_trans.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_trans = np.square(np.where(hedging_err_trans > 0, hedging_err_trans, 0))
-
+rsmse_trans = np.sqrt(np.mean(semi_square_hedging_err_trans))
 
 agent_lstm = DeepAgentLSTM.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
@@ -83,7 +82,7 @@ print("DONE LSTM")
 agent_lstm.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_lstm)
 deltas_lstm, hedging_err_lstm, S_t_lstm, V_t_lstm, A_t_lstm, B_t_lstm, = agent_lstm.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_lstm = np.square(np.where(hedging_err_lstm > 0, hedging_err_lstm, 0))
-
+rsmse_lstm = np.sqrt(np.mean(semi_square_hedging_err_lstm))
 
 agent_gru = DeepAgentGRU.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
@@ -95,7 +94,7 @@ print("DONE GRU")
 agent_gru.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_gru)
 deltas_gru, hedging_err_gru, S_t_gru, V_t_gru, A_t_gru, B_t_gru, = agent_gru.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_gru = np.square(np.where(hedging_err_gru > 0, hedging_err_gru, 0))
-
+rsmse_gru = np.sqrt(np.mean(semi_square_hedging_err_gru))
 
 agent = DeepAgent.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
@@ -107,7 +106,7 @@ print("DONE FFNN")
 agent.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_ffnn)
 deltas_ffnn, hedging_err_ffnn, S_t_ffnn, V_t_ffnn, A_t_ffnn, B_t_ffnn, = agent.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_ffnn = np.square(np.where(hedging_err_ffnn > 0, hedging_err_ffnn, 0))
-
+rsmse_ffnn = np.sqrt(np.mean(semi_square_hedging_err_ffnn))
 
 print(" ----------------- ")
 print(" Deep Hedging %s TRANSFORMER Results" % (loss_type))
@@ -135,6 +134,15 @@ print(" ----------------- ")
 deltas_DH, hedging_err_DH = Utils_general.delta_hedge_res(S_t_ffnn, r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type="Call", position_type="Short", strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas)
 Utils_general.print_stats(hedging_err_DH, deltas_DH, "Delta hedge", "Delta hedge", V_0)
 semi_square_hedging_err_DH = np.square(np.where(hedging_err_DH > 0, hedging_err_DH, 0))
+rsmse_DH = np.sqrt(np.mean(semi_square_hedging_err_DH))
+
+print()
+
+print("|--------------------------------------Comparison of RSMSE--------------------------------------|")
+print("|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|")
+print("|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH))
+print("|-----------------------|---------------|---------------|---------------|-----------------------|")
 
 print()
 
@@ -180,6 +188,15 @@ print("|-----------------------|-----------------------|---------------|--------
 print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_ffnn_trans, smse_ffnn_gru, smse_ffnn_lstm, smse_ffnn_ffnn, smse_ffnn_DH))
 print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
 print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+
+print()
+
+print("|-----------------------------------------------------------------------Comparison of Mean Hedging Error------------------------------------------------------------------------|")
+print("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t\t|\t\tFFNN\t\t|\t\tDelta Hedge\t\t|")
+print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
+print("|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t\t|".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1)))
+print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
 
 print()
 
@@ -225,7 +242,17 @@ print("|-----------------------|-----------------------|---------------|--------
 print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_ffnn_trans, mean_ffnn_gru, mean_ffnn_lstm, mean_ffnn_ffnn, mean_ffnn_DH))
 print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
 print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
 
+print()
+
+def count_parameters(agent):
+    return sum(p.numel() for p in agent.model.parameters() if p.requires_grad)
+
+print("TRANSFORMER PARAMETERS: ", count_parameters(agent_trans))
+print("GRU PARAMETERS: ", count_parameters(agent_gru))
+print("LSTM PARAMETERS: ", count_parameters(agent_lstm))
+print("FFNN PARAMETERS: ", count_parameters(agent))
 
 all_losses_fig = plt.figure(figsize=(10, 5))
 plt.plot(all_losses_lstm, label="LSTM")
@@ -299,7 +326,7 @@ plt.legend()
 plt.title("Hedging errors for FFNN vs Delta-Hedge - " + str(nbs_point_traj))
 plt.savefig("Hedging_Errors_FFNN_DH" + str(nbs_point_traj) + ".png")
 
-# Only works for FFNN
+# Does not work with Transformers
 # point_pred = agent.point_predict(t=6, S_t=1800, V_t=1, A_t=0, B_t=0, delta_t=0.0)
 # print("Point Pred with (t=6, S_t=1800, V_t=1, A_t=0, B_t=0, delta_t=0.0): ", point_pred)
 # point_pred = agent.point_predict(t=1, S_t=1800, V_t=1, A_t=0, B_t=0, delta_t=0.0)

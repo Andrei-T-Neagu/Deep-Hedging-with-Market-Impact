@@ -68,7 +68,7 @@ class DeepAgent():
         # Device the computations will take place on
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Model
-        self.model = Transformer(in_features=6, seq_length=self.N, d_model=self.nbs_units, dim_feedforward=self.nbs_units, n_heads=4, num_layers=self.nbs_layers).to(self.device)
+        self.model = Transformer(in_features=6, seq_length=self.N, d_model=self.nbs_units, dim_feedforward=self.nbs_units, n_heads=8, num_layers=self.nbs_layers).to(self.device)
         
         self.name = name
         print("Initial value of the portfolio: ", V_0)

@@ -64,7 +64,7 @@ class DeepAgent():
         self.strike = strike
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = FFNN(in_features=6, num_layers=2, hidden_size=52).to(self.device)
+        self.model = FFNN(in_features=6, num_layers=nbs_layers, hidden_size=nbs_units).to(self.device)
         
         self.name = name
         print("Initial value of the portfolio: ", V_0)
