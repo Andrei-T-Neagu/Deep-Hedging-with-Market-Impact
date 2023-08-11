@@ -12,29 +12,29 @@ import DeepAgentLSTM
 import DeepAgentGRU
 from scipy.stats import ttest_ind
 
-nbs_point_traj = 31
+nbs_point_traj = 9
 batch_size = 256
 train_size = 100000
-test_size = 200000
-epochs = 10
+test_size = 100000
+epochs = 50
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
 params_vect = [0.1, 0.1898]
 S_0 = 1000
-T = 30/252
-alpha = 1.0
-beta = 1.0
+T = 1/252
+alpha = 1.05
+beta = 0.95
 loss_type = "RSMSE"
 option_type = "call"
 position_type = "short"
 strike = 1000
-nbs_layers = 5
+nbs_layers = 4
 nbs_units = 128
 lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
-lambdas = [-1, -1]
+lambdas = [1, 1]
 
 name_ffnn = 'ffnn_model'
 name_lstm = 'lstm_model'
@@ -144,6 +144,14 @@ print("|-----------------------|---------------|---------------|---------------|
 print("|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH))
 print("|-----------------------|---------------|---------------|---------------|-----------------------|")
 
+with open("Comparison_RSMSE_" + str(nbs_point_traj) + ".txt", "w") as rsmse_file:
+    # Writing data to a file
+    rsmse_file.write("|--------------------------------------Comparison of RSMSE--------------------------------------|\n")
+    rsmse_file.write("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
+    rsmse_file.write("|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    rsmse_file.write("|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH))
+    rsmse_file.write("|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+
 print()
 
 smse_trans_trans = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
@@ -190,6 +198,22 @@ print("|-----------------------|-----------------------|---------------|--------
 print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH))
 print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
 
+with open("SMSE_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as smse_file:
+    # Writing data to a file
+    smse_file.write("|------------------------------------------------T-Test for Smaller SMSE------------------------------------------------|\n")
+    smse_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    smse_file.write("|\t\tTransformer\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_trans_trans, smse_trans_gru, smse_trans_lstm, smse_trans_ffnn, smse_trans_DH))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    smse_file.write("|\t\tGRU\t\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_gru_trans, smse_gru_gru, smse_gru_lstm, smse_gru_ffnn, smse_gru_DH))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    smse_file.write("|\t\tLSTM\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_lstm_trans, smse_lstm_gru, smse_lstm_lstm, smse_lstm_ffnn, smse_lstm_DH))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    smse_file.write("|\t\tFFNN\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_ffnn_trans, smse_ffnn_gru, smse_ffnn_lstm, smse_ffnn_ffnn, smse_ffnn_DH))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    smse_file.write("|\t\tDelta Hedge\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+
 print()
 
 print("|-----------------------------------------------------------------------Comparison of Mean Hedging Error------------------------------------------------------------------------|")
@@ -197,6 +221,14 @@ print("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t\t|\t\tFFNN\t\t|\t\tDelta Hedg
 print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
 print("|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t\t|".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1)))
 print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
+
+with open("mean_hedging_error_" + str(nbs_point_traj) + ".txt", "w") as mean_file:
+    # Writing data to a file
+    mean_file.write("|-----------------------------------------------------------------------Comparison of Mean Hedging Error------------------------------------------------------------------------|\n")
+    mean_file.write("|\t\t\t\tTransformer\t\t\t\t|\t\t\tGRU\t\t\t\t\t|\t\t\tLSTM\t\t\t\t|\t\t\tFFNN\t\t\t\t|\t\t\t\tDelta Hedge\t\t\t\t|\n")
+    mean_file.write("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|\n")
+    mean_file.write("|\t\t\t{:.4f} +- {:.4f}\t\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t\t{:.4f} +- {:.4f}\t\t\t|\n".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1)))
+    mean_file.write("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|\n")
 
 print()
 
@@ -244,6 +276,22 @@ print("|-----------------------|-----------------------|---------------|--------
 print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH))
 print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
 
+with open("Mean_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as mean_test_file:
+    # Writing data to a file
+    mean_test_file.write("|-----------------------------------------T-Test for Smaller Mean Hedging Error-----------------------------------------|\n")
+    mean_test_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    mean_test_file.write("|\t\tTransformer\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_trans_trans, mean_trans_gru, mean_trans_lstm, mean_trans_ffnn, mean_trans_DH))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    mean_test_file.write("|\t\tGRU\t\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_gru_trans, mean_gru_gru, mean_gru_lstm, mean_gru_ffnn, mean_gru_DH))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    mean_test_file.write("|\t\tLSTM\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_lstm_trans, mean_lstm_gru, mean_lstm_lstm, mean_lstm_ffnn, mean_lstm_DH))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    mean_test_file.write("|\t\tFFNN\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_ffnn_trans, mean_ffnn_gru, mean_ffnn_lstm, mean_ffnn_ffnn, mean_ffnn_DH))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    mean_test_file.write("|\t\tDelta Hedge\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+
 print()
 
 def count_parameters(agent):
@@ -269,6 +317,14 @@ plt.plot(trans_losses, label="Transformer")
 plt.plot(gru_losses, label="GRU")
 plt.legend()
 plt.savefig("epoch_losses" + str(nbs_point_traj) + ".png")
+
+log_epoch_losses_fig = plt.figure(figsize=(10, 5))
+plt.plot(np.log(lstm_losses), label="LSTM")
+plt.plot(np.log(ffnn_losses), label="FFNN")
+plt.plot(np.log(trans_losses), label="Transformer")
+plt.plot(np.log(gru_losses), label="GRU")
+plt.legend()
+plt.savefig("log_epoch_losses" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_gru, hedging_err_trans], bins=50, label=["GRU", "Transformer"])
