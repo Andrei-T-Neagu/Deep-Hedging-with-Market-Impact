@@ -60,6 +60,7 @@ for i in range(int(test_size/batch_size)):
         test_set[i, j, :] = S_t
 
 
+
 agent_trans = DeepAgentTransformer.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
                  nbs_shares, lambdas, name=name_transformer)

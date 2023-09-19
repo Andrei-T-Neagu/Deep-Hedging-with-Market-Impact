@@ -382,8 +382,8 @@ class DeepAgent():
         elif self.prepro_stock == "log-moneyness":
             S_t = torch.log(S_t/self.strike)
 
-        input_t = torch.stack((self.dt * t, S_t, delta_t, V_t/self.V_0, A_t, B_t), dim=1)
-
+        input_t = torch.stack((self.dt * t, S_t, delta_t, V_t/self.V_0, A_t, B_t), dim=1).to(device=self.device)
+        
         with torch.no_grad():
             delta_t_next = self.model(input_t)
 
