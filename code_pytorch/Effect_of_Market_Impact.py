@@ -6,10 +6,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import Utils_general
-import DeepAgent
+import code_pytorch.DeepAgent as DeepAgent
 import DeepAgentTransformer
-import DeepAgentLSTM
-import DeepAgentGRU
+import code_pytorch.DeepAgentLSTM as DeepAgentLSTM
+import code_pytorch.DeepAgentGRU as DeepAgentGRU
 from scipy.stats import ttest_ind
 
 nbs_point_traj = 13
@@ -63,7 +63,7 @@ for loss in loss_types:
         alpha = 1.0+impact
         beta = 1.0-impact
 
-        name = "{loss_type}_hedging_{impact}_market_impact".format(loss_type="quadratic" if loss_type=="RMSE" else "semi_quadratic", impact="no" if alpha==1.0 and beta==1.0 else "with")
+        name = "effect_of_market_impact/{loss_type}_hedging_{impact}_market_impact".format(loss_type="quadratic" if loss_type=="RMSE" else "semi_quadratic", impact="no" if alpha==1.0 and beta==1.0 else "with")
         agent = DeepAgent.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                         loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
                         nbs_shares, lambdas, name=name)
@@ -111,6 +111,6 @@ for loss in loss_types:
         plt.grid()
         plt.legend()
         plt.title("ATM Call - Delta Hedge vs {loss_type} - {impact} - time_t = 0.5000".format(loss_type=loss_type, impact="No liquidity impact" if alpha==1.0 and beta==1.0 else "alpha = {:.4f} beta = {:.4f}").format(alpha, beta))
-        plt.savefig("{loss_type} hedging, {impact} market impact".format(loss_type="Quadratic" if loss_type=="RMSE" else "Semi-quadratic", impact="no" if alpha==1.0 and beta==1.0 else "with"))
+        plt.savefig("effect_of_market_impact/{loss_type} hedging, {impact} market impact".format(loss_type="Quadratic" if loss_type=="RMSE" else "Semi-quadratic", impact="no" if alpha==1.0 and beta==1.0 else "with"))
 
         print()

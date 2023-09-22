@@ -6,10 +6,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import Utils_general
-import DeepAgent
+import code_pytorch.DeepAgent as DeepAgent
 import DeepAgentTransformer
-import DeepAgentLSTM
-import DeepAgentGRU
+import code_pytorch.DeepAgentLSTM as DeepAgentLSTM
+import code_pytorch.DeepAgentGRU as DeepAgentGRU
 from scipy.stats import ttest_ind
 
 nbs_point_traj = 13
@@ -73,7 +73,7 @@ for T in Ts:
         alpha = 1.0+impact
         beta = 1.0-impact
 
-        name = "{loss_type}_hedging_{impact:.4f}_market_impact_single_path_{time_period}".format(loss_type="quadratic" if loss_type=="RMSE" else "semi_quadratic", impact=impact, time_period=time_period)
+        name = "effect_of_market_impact_single_path/{loss_type}_hedging_{impact:.4f}_market_impact_single_path_{time_period}".format(loss_type="quadratic" if loss_type=="RMSE" else "semi_quadratic", impact=impact, time_period=time_period)
         agent = DeepAgent.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                         loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
                         nbs_shares, lambdas, name=name)
@@ -106,7 +106,7 @@ for T in Ts:
     plt.ylabel('S_t (stock price)')
     plt.legend()
     plt.title("Path of stock prices - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
-    plt.savefig("path_of_stock_prices_effect_of_market_impact_{}".format(time_period))
+    plt.savefig("effect_of_market_impact_single_path/path_of_stock_prices_effect_of_market_impact_{}".format(time_period))
 
     fig = plt.figure(figsize=(10, 5))
     plt.plot(deltas_DH, label="Delta hedge")
@@ -117,7 +117,7 @@ for T in Ts:
     plt.grid()
     plt.legend()
     plt.title("Path of deltas - Time Period: {time_period} - only RSMSE - shares = 1".format(time_period=time_period))
-    plt.savefig("path_of_deltas_effect_of_market_impact_{}".format(time_period))
+    plt.savefig("effect_of_market_impact_single_path/path_of_deltas_effect_of_market_impact_{}".format(time_period))
 
     diff_deltas_DH = np.ones((deltas_DH.shape[0]-1, deltas_DH.shape[1]))
     for i in range(deltas_DH.shape[0]-1):
@@ -139,6 +139,6 @@ for T in Ts:
     plt.grid()
     plt.legend()
     plt.title("Path of diff deltas - Time Period: {time_period} - only RSMSE - shares = 1".format(time_period=time_period))
-    plt.savefig("path_of_diff_deltas_effect_of_market_impact_{}".format(time_period))
+    plt.savefig("effect_of_market_impact_single_path/path_of_diff_deltas_effect_of_market_impact_{}".format(time_period))
 
     print()
