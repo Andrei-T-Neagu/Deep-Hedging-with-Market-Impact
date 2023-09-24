@@ -41,3 +41,18 @@ print("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t\t|\t\tFFNN\t\t|\t\tDelta Hedg
 print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
 print("|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t\t|".format(np.random.randn(), np.random.randn(), np.random.randn(), np.random.randn(), np.random.randn(), np.random.randn(), np.random.randn(), np.random.randn(), np.random.randn(), np.random.randn()))
 print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
+
+
+lstm_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
+ffnn_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
+trans_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
+gru_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
+
+log_epoch_losses_fig = plt.figure(figsize=(10, 5))
+plt.plot(lstm_losses, label="LSTM")
+plt.plot(ffnn_losses, label="FFNN")
+plt.plot(trans_losses, label="Transformer")
+plt.plot(gru_losses, label="GRU")
+plt.yscale("log")
+plt.legend()
+plt.savefig("code_pytorch/log_losses_test.png")

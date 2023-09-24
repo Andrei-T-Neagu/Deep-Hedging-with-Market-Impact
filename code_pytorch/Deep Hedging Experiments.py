@@ -23,23 +23,23 @@ stock_dyn = "BSM"
 params_vect = [0.1, 0.1898]
 S_0 = 1000
 T = 1/252
-alpha = 1.05
-beta = 0.95
+alpha = 1.02
+beta = 0.98
 loss_type = "RSMSE"
 option_type = "call"
 position_type = "short"
 strike = 1000
-nbs_layers = 5
+nbs_layers = 4
 nbs_units = 256
 lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
-lambdas = [1, 1]
+lambdas = [0.7, 0.7]
 
-name_ffnn = 'ffnn_model'
-name_lstm = 'lstm_model'
-name_gru = 'gru_model'
-name_transformer = 'transformer_model'
+name_ffnn = 'code_pytorch/ffnn_model'
+name_lstm = 'code_pytorch/lstm_model'
+name_gru = 'code_pytorch/gru_model'
+name_transformer = 'code_pytorch/transformer_model'
 
 if (option_type == 'Call'):
     V_0 = Utils_general.BlackScholes_price(S_0, T, r_borrow, params_vect[1], strike, 1)
@@ -73,6 +73,17 @@ deltas_trans, hedging_err_trans, S_t_trans, V_t_trans, A_t_trans, B_t_trans, = a
 semi_square_hedging_err_trans = np.square(np.where(hedging_err_trans > 0, hedging_err_trans, 0))
 rsmse_trans = np.sqrt(np.mean(semi_square_hedging_err_trans))
 
+print("TRANSFORMER TEST SET STATISTICS")
+S_t_trans_last = S_t_trans[-1, -5:]
+B_t_trans_last = B_t_trans[-1, -5:]
+print("S_t last: ", S_t_trans_last)
+print("B_t last: ", B_t_trans_last)
+S_t_trans_selling = S_t_trans_last * ((1 + 1 + B_t_trans_last) ** beta - (1 + B_t_trans_last) ** beta)
+print()
+print(S_t_trans_selling)
+print("MUST BE BIGGER THAN")
+print(strike)
+
 agent_lstm = DeepAgentLSTM.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
                  nbs_shares, lambdas, name=name_lstm)
@@ -84,6 +95,17 @@ agent_lstm.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + 
 deltas_lstm, hedging_err_lstm, S_t_lstm, V_t_lstm, A_t_lstm, B_t_lstm, = agent_lstm.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_lstm = np.square(np.where(hedging_err_lstm > 0, hedging_err_lstm, 0))
 rsmse_lstm = np.sqrt(np.mean(semi_square_hedging_err_lstm))
+
+print("LSTM TEST SET STATISTICS")
+S_t_lstm_last = S_t_lstm[-1, -5:]
+B_t_lstm_last = B_t_lstm[-1, -5:]
+print("S_t last: ", S_t_lstm_last)
+print("B_t last: ", B_t_lstm_last)
+S_t_lstm_selling = S_t_lstm_last * ((1 + 1 + B_t_lstm_last) ** beta - (1 + B_t_lstm_last) ** beta)
+print()
+print(S_t_lstm_selling)
+print("MUST BE BIGGER THAN")
+print(strike)
 
 agent_gru = DeepAgentGRU.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
@@ -97,6 +119,20 @@ deltas_gru, hedging_err_gru, S_t_gru, V_t_gru, A_t_gru, B_t_gru, = agent_gru.tes
 semi_square_hedging_err_gru = np.square(np.where(hedging_err_gru > 0, hedging_err_gru, 0))
 rsmse_gru = np.sqrt(np.mean(semi_square_hedging_err_gru))
 
+print("GRU TEST SET STATISTICS")
+S_t_gru_last = S_t_gru[-1, -5:]
+B_t_gru_last = B_t_gru[-1, -5:]
+print("S_t last: ", S_t_gru_last)
+print("B_t last: ", B_t_gru_last)
+S_t_gru_selling = S_t_gru_last * ((1 + 1 + B_t_gru_last) ** beta - (1 + B_t_gru_last) ** beta)
+print()
+print(S_t_gru_selling)
+print("MUST BE BIGGER THAN")
+print(strike)
+
+nbs_layers = 6
+nbs_units = 512
+
 agent = DeepAgent.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
                  loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
                  nbs_shares, lambdas, name=name_ffnn)
@@ -108,6 +144,17 @@ agent.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_
 deltas_ffnn, hedging_err_ffnn, S_t_ffnn, V_t_ffnn, A_t_ffnn, B_t_ffnn, = agent.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_ffnn = np.square(np.where(hedging_err_ffnn > 0, hedging_err_ffnn, 0))
 rsmse_ffnn = np.sqrt(np.mean(semi_square_hedging_err_ffnn))
+
+print("FFNN TEST SET STATISTICS")
+S_t_ffnn_last = S_t_ffnn[-1, -5:]
+B_t_ffnn_last = B_t_ffnn[-1, -5:]
+print("S_t last: ", S_t_ffnn_last)
+print("B_t last: ", B_t_ffnn_last)
+S_t_ffnn_selling = S_t_ffnn_last * ((1 + 1 + B_t_ffnn_last) ** beta - (1 + B_t_ffnn_last) ** beta)
+print()
+print(S_t_ffnn_selling)
+print("MUST BE BIGGER THAN")
+print(strike)
 
 print(" ----------------- ")
 print(" Deep Hedging %s TRANSFORMER Results" % (loss_type))
@@ -145,7 +192,7 @@ print("|-----------------------|---------------|---------------|---------------|
 print("|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH))
 print("|-----------------------|---------------|---------------|---------------|-----------------------|")
 
-with open("Comparison_RSMSE_" + str(nbs_point_traj) + ".txt", "w") as rsmse_file:
+with open("code_pytorch/errors_experiments/Comparison_RSMSE_" + str(nbs_point_traj) + ".txt", "w") as rsmse_file:
     # Writing data to a file
     rsmse_file.write("|--------------------------------------Comparison of RSMSE--------------------------------------|\n")
     rsmse_file.write("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
@@ -199,7 +246,7 @@ print("|-----------------------|-----------------------|---------------|--------
 print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH))
 print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
 
-with open("SMSE_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as smse_file:
+with open("code_pytorch/errors_experiments/SMSE_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as smse_file:
     # Writing data to a file
     smse_file.write("|------------------------------------------------T-Test for Smaller SMSE------------------------------------------------|\n")
     smse_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
@@ -223,7 +270,7 @@ print("|---------------------------------------|-------------------------------|
 print("|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t\t|".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1)))
 print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
 
-with open("mean_hedging_error_" + str(nbs_point_traj) + ".txt", "w") as mean_file:
+with open("code_pytorch/errors_experiments/mean_hedging_error_" + str(nbs_point_traj) + ".txt", "w") as mean_file:
     # Writing data to a file
     mean_file.write("|-----------------------------------------------------------------------Comparison of Mean Hedging Error------------------------------------------------------------------------|\n")
     mean_file.write("|\t\t\t\tTransformer\t\t\t\t|\t\t\tGRU\t\t\t\t\t|\t\t\tLSTM\t\t\t\t|\t\t\tFFNN\t\t\t\t|\t\t\t\tDelta Hedge\t\t\t\t|\n")
@@ -277,7 +324,7 @@ print("|-----------------------|-----------------------|---------------|--------
 print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH))
 print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
 
-with open("Mean_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as mean_test_file:
+with open("code_pytorch/errors_experiments/Mean_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as mean_test_file:
     # Writing data to a file
     mean_test_file.write("|-----------------------------------------T-Test for Smaller Mean Hedging Error-----------------------------------------|\n")
     mean_test_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
@@ -309,7 +356,7 @@ plt.plot(all_losses_ffnn, label="FFNN")
 plt.plot(all_losses_trans, label="Transformer")
 plt.plot(all_losses_gru, label="GRU")
 plt.legend()
-plt.savefig("all_losses" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/all_losses" + str(nbs_point_traj) + ".png")
 
 epoch_losses_fig = plt.figure(figsize=(10, 5))
 plt.plot(lstm_losses, label="LSTM")
@@ -317,15 +364,16 @@ plt.plot(ffnn_losses, label="FFNN")
 plt.plot(trans_losses, label="Transformer")
 plt.plot(gru_losses, label="GRU")
 plt.legend()
-plt.savefig("epoch_losses" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/epoch_losses" + str(nbs_point_traj) + ".png")
 
 log_epoch_losses_fig = plt.figure(figsize=(10, 5))
-plt.plot(np.log(lstm_losses), label="LSTM")
-plt.plot(np.log(ffnn_losses), label="FFNN")
-plt.plot(np.log(trans_losses), label="Transformer")
-plt.plot(np.log(gru_losses), label="GRU")
+plt.plot(lstm_losses, label="LSTM")
+plt.plot(ffnn_losses, label="FFNN")
+plt.plot(trans_losses, label="Transformer")
+plt.plot(gru_losses, label="GRU")
+plt.yscale("log")
 plt.legend()
-plt.savefig("log_epoch_losses" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/log_epoch_losses" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_gru, hedging_err_trans], bins=50, label=["GRU", "Transformer"])
@@ -333,7 +381,7 @@ plt.xlabel('Hedging error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging errors for GRU / Transformer - " + str(nbs_point_traj))
-plt.savefig("Hedging_Errors_GRU_Transformer" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/hedging_errors/Hedging_Errors_GRU_Transformer" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_gru, hedging_err_lstm], bins=50, label=["GRU", "LSTM"])
@@ -341,7 +389,7 @@ plt.xlabel('Hedging error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging errors for GRU / LSTM - " + str(nbs_point_traj))
-plt.savefig("Hedging_Errors_GRU_LSTM" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/hedging_errors/Hedging_Errors_GRU_LSTM" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_gru, hedging_err_ffnn], bins=50, label=["GRU", "FFNN"])
@@ -349,7 +397,7 @@ plt.xlabel('Hedging error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging errors for GRU / FFNN - " + str(nbs_point_traj))
-plt.savefig("Hedging_Errors_GRU_FFNN" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/hedging_errors/Hedging_Errors_GRU_FFNN" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_lstm, hedging_err_trans], bins=50, label=["LSTM", "Transformer"])
@@ -357,7 +405,7 @@ plt.xlabel('Hedging error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging errors for LSTM / Transformer - " + str(nbs_point_traj))
-plt.savefig("Hedging_Errors_LSTM_Transformer" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/hedging_errors/Hedging_Errors_LSTM_Transformer" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_ffnn, hedging_err_trans], bins=50, label=["ffnn", "Transformer"])
@@ -365,7 +413,7 @@ plt.xlabel('Hedging error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging errors for FFNN / Transformer - " + str(nbs_point_traj))
-plt.savefig("Hedging_Errors_FFNN_Transformer" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/hedging_errors/Hedging_Errors_FFNN_Transformer" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_ffnn, hedging_err_lstm], bins=50, label=["ffnn", "LSTM"])
@@ -373,7 +421,7 @@ plt.xlabel('Hedging error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging errors for FFNN / LSTM - " + str(nbs_point_traj))
-plt.savefig("Hedging_Errors_FFNN_LSTM" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/hedging_errors/Hedging_Errors_FFNN_LSTM" + str(nbs_point_traj) + ".png")
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist([hedging_err_ffnn, hedging_err_DH], bins=50, label=["FFNN", "Delta-Hedge"])
@@ -381,7 +429,7 @@ plt.xlabel('Hedging error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging errors for FFNN vs Delta-Hedge - " + str(nbs_point_traj))
-plt.savefig("Hedging_Errors_FFNN_DH" + str(nbs_point_traj) + ".png")
+plt.savefig("code_pytorch/errors_experiments/hedging_errors/Hedging_Errors_FFNN_DH" + str(nbs_point_traj) + ".png")
 
 # Does not work with Transformers
 # point_pred = agent.point_predict(t=6, S_t=1800, V_t=1, A_t=0, B_t=0, delta_t=0.0)

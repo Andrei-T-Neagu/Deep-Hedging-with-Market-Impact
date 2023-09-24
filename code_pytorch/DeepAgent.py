@@ -374,7 +374,7 @@ class DeepAgent():
         B_t = torch.tensor([B_t])
         t = torch.tensor([t])
         delta_t = torch.tensor([delta_t])
-        V_t = torch.tensor([V_t])
+        V_t = torch.tensor([V_t], dtype=torch.float32)
 
         # Processing stock price
         if self.prepro_stock == "log":
