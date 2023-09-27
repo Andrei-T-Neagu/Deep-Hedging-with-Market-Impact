@@ -56,3 +56,6 @@ plt.plot(gru_losses, label="GRU")
 plt.yscale("log")
 plt.legend()
 plt.savefig("code_pytorch/log_losses_test.png")
+
+value = np.ones(1)
+print(str(value.item()))

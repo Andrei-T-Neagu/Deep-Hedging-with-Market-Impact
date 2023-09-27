@@ -64,7 +64,7 @@ for T in Ts:
         for j in range(N):
             Z = torch.randn(batch_size, device=device)
             S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
-            test_set[i, j, :] = S_t
+            test_set[i, j+1, :] = S_t
 
     loss_type = "RSMSE"
     impact_values = [0.0, 0.0018, 0.025]

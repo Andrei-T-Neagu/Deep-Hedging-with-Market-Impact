@@ -52,7 +52,7 @@ for i in range(int(test_size/batch_size)):
     for j in range(N):
         Z = torch.randn(batch_size, device=device)
         S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
-        test_set[i, j, :] = S_t
+        test_set[i, j+1, :] = S_t
 
 
 loss_types = ["RMSE", "RSMSE"]

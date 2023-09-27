@@ -152,7 +152,7 @@ class DeepAgent():
             # Update features for next time step (market impact persistence already updated)
             # Update stock price
             if test_path is not None:
-                self.S_t = test_path[t]
+                self.S_t = test_path[t+1]
             else:
                 if self.stock_dyn == "BSM":
                     Z = torch.randn(self.batch_size, device=self.device)
@@ -365,7 +365,7 @@ class DeepAgent():
                 V_t_tensor_pred.append(V_t_tensor.detach().cpu().numpy())
                 A_t_tensor_pred.append(A_t_tensor.detach().cpu().numpy())
                 B_t_tensor_pred.append(B_t_tensor.detach().cpu().numpy())
-
+        
         return np.concatenate(strategy_pred, axis=1), np.concatenate(hedging_err_pred), np.concatenate(S_t_tensor_pred, axis=1), np.concatenate(V_t_tensor_pred, axis=1), np.concatenate(A_t_tensor_pred, axis=1), np.concatenate(B_t_tensor_pred, axis=1)
 
     def point_predict(self, t, S_t, V_t, A_t, B_t, delta_t):

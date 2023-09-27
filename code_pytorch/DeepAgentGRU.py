@@ -163,7 +163,7 @@ class DeepAgent():
             # Update features for next time step (market impact persistence already updated)
             # Update stock price
             if test_path is not None:
-                self.S_t = test_path[t]
+                self.S_t = test_path[t+1]
             else:
                 if self.stock_dyn == "BSM":
                     Z = torch.randn(self.batch_size, device=self.device)

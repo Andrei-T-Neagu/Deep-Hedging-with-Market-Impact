@@ -11,7 +11,6 @@ import DeepAgentTransformer
 import DeepAgentLSTM as DeepAgentLSTM
 import DeepAgentGRU as DeepAgentGRU
 from scipy.stats import ttest_ind
-from ray import train, tune
 
 nbs_point_traj = 13
 batch_size = 256
@@ -53,7 +52,7 @@ for i in range(int(test_size/batch_size)):
     for j in range(N):
         Z = torch.randn(batch_size, device=device)
         S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
-        test_set[i, j, :] = S_t
+        test_set[i, j+1, :] = S_t
 
 strikes = [800, 1000, 1200]
 loss_types = ["RSMSE"]
