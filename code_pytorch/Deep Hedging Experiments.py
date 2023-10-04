@@ -12,29 +12,29 @@ import DeepAgentLSTM
 import DeepAgentGRU
 from scipy.stats import ttest_ind
 
-nbs_point_traj = 12
+nbs_point_traj = 13
 batch_size = 256
 train_size = 100000
 test_size = 100000
-epochs = 1
+epochs = 100
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
 params_vect = [0.1, 0.1898]
 S_0 = 1000
 T = 252/252
-alpha = 1.02
-beta = 0.98
+alpha = 1.025
+beta = 0.975
 loss_type = "RSMSE"
 option_type = "call"
 position_type = "short"
 strike = 1000
-nbs_layers = 2
+nbs_layers = 4
 nbs_units = 256
 lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
-lambdas = [1, 1]
+lambdas = [1, 1] # impact persistence of 0.37
 
 name_ffnn = 'code_pytorch/ffnn_model'
 name_lstm = 'code_pytorch/lstm_model'

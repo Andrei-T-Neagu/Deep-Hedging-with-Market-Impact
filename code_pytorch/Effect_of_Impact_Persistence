@@ -57,7 +57,7 @@ for i in range(int(test_size/batch_size)):
 strikes = [800, 1000, 1200]
 loss_types = ["RSMSE"]
 impact_values = [0.01, 0.025]
-impact_persistence = [9284.023, 4642.01, 1397.38, -1]
+impact_persistence = [0, 0.7, 1.1, -1] # impact persistence of {1, 0.5, 0.33, 0}
 for loss in loss_types:
     for strike in strikes:
         for impact in impact_values:
@@ -99,7 +99,7 @@ for loss in loss_types:
                 deltas_DH, hedging_err_DH = Utils_general.delta_hedge_res(spot_prices_dh, r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type="Call", position_type="Short", strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas)
                 deltas = np.zeros((25))
                 for i, spot in enumerate(spot_prices):
-                    point_pred = agent.point_predict(t=6, S_t=spot, V_t=V_0, A_t=alpha, B_t=beta, delta_t=0.5)
+                    point_pred = agent.point_predict(t=6, S_t=spot, V_t=V_0, A_t=0.5, B_t=0.5, delta_t=0.5)
                     deltas[i] = point_pred
 
                 
