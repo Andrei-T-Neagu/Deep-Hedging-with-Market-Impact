@@ -57,7 +57,7 @@ for i in range(int(test_size/batch_size)):
 strikes = [800, 1000, 1200]
 loss_types = ["RSMSE"]
 impact_values = [0.01, 0.025]
-impact_persistence = [0, 0.7, 1.1, -1] # impact persistence of {1, 0.5, 0.33, 0}
+impact_persistence = [0, -math.log(0.5)/dt, -math.log(0.3333)/dt, -1] # impact persistence of {1, 0.5, 0.33, 0}
 for loss in loss_types:
     for strike in strikes:
         for impact in impact_values:
