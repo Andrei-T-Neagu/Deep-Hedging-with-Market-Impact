@@ -33,7 +33,7 @@ class Transformer(nn.Module):
 class DeepAgent():
     
     def __init__(self, nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
-                 loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
+                 loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, num_heads, lr, prepro_stock,
                  nbs_shares, lambdas, name='model'):
         
         self.nbs_point_traj = nbs_point_traj
@@ -52,6 +52,7 @@ class DeepAgent():
         self.V_0 = V_0
         self.nbs_layers = nbs_layers
         self.nbs_units = nbs_units
+        self.num_heads = num_heads
         self.lr = lr
         self.prepro_stock = prepro_stock
         self.nbs_shares = nbs_shares
@@ -68,7 +69,7 @@ class DeepAgent():
         # Device the computations will take place on
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Model
-        self.model = Transformer(in_features=6, seq_length=self.N, d_model=self.nbs_units, dim_feedforward=self.nbs_units, n_heads=8, num_layers=self.nbs_layers).to(self.device)
+        self.model = Transformer(in_features=6, seq_length=self.N, d_model=self.nbs_units, dim_feedforward=self.nbs_units, n_heads=self.num_heads, num_layers=self.nbs_layers).to(self.device)
         
         self.name = name
         print("Initial value of the portfolio: ", V_0)
