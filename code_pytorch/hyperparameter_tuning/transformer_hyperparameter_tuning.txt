@@ -1,10 +1,2 @@
 |---------------------------Hyperparameter Tuning for Transformer for 1 Epochs------------------------|
-{'batch_size': 64, 'nbs_layers': 5, 'nbs_units': 1024}: Validation Loss: 30.392858505249023 | Test Loss: 30.371171951293945 | Number of Parameters: 31547393 | Time Taken: 0:35:28.132958
-{'batch_size': 128, 'nbs_layers': 5, 'nbs_units': 512}: Validation Loss: 30.440780639648438 | Test Loss: 30.42356300354004 | Number of Parameters: 7909377 | Time Taken: 0:12:03.420651
-{'batch_size': 64, 'nbs_layers': 10, 'nbs_units': 512}: Validation Loss: 30.567359924316406 | Test Loss: 30.55001449584961 | Number of Parameters: 15799297 | Time Taken: 0:26:00.142218
-{'batch_size': 128, 'nbs_layers': 2, 'nbs_units': 1024}: Validation Loss: 30.626235961914062 | Test Loss: 30.600088119506836 | Number of Parameters: 12642305 | Time Taken: 0:13:45.295968
-{'batch_size': 128, 'nbs_layers': 10, 'nbs_units': 256}: Validation Loss: 30.967737197875977 | Test Loss: 30.937868118286133 | Number of Parameters: 3967489 | Time Taken: 0:11:11.107610
-{'batch_size': 256, 'nbs_layers': 4, 'nbs_units': 256}: Validation Loss: 31.377376556396484 | Test Loss: 31.349685668945312 | Number of Parameters: 1592833 | Time Taken: 0:04:19.179896
-{'batch_size': 256, 'nbs_layers': 2, 'nbs_units': 256}: Validation Loss: 31.439104080200195 | Test Loss: 31.423696517944336 | Number of Parameters: 801281 | Time Taken: 0:02:12.687724
-{'batch_size': 512, 'nbs_layers': 2, 'nbs_units': 256}: Validation Loss: 32.44667434692383 | Test Loss: 32.4236946105957 | Number of Parameters: 801281 | Time Taken: 0:02:07.524217
-{'batch_size': 512, 'nbs_layers': 4, 'nbs_units': 128}: Validation Loss: 32.793968200683594 | Test Loss: 32.76588439941406 | Number of Parameters: 403201 | Time Taken: 0:02:24.929231
+{'batch_size': 256, 'nbs_layers': 4, 'nbs_units': 256, 'num_heads': 8}: Validation Loss: 27.074357986450195 | Test Loss: 27.205123901367188 | Number of Parameters: 1592833 | Time Taken: 0:04:18.601462

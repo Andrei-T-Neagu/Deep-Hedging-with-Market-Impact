@@ -43,11 +43,11 @@ print("|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f
 print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
 
 
-lstm_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
-ffnn_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
-trans_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
-gru_losses = np.exp(-np.linspace(0, 100, 100))*np.random.rand(100)
-
+lstm_losses = np.exp(-np.linspace(-5, -4, 100))*np.random.rand(100)
+ffnn_losses = np.exp(-np.linspace(-5, -4, 100))*np.random.rand(100)
+trans_losses = np.exp(-np.linspace(-5, -4, 100))*np.random.rand(100)
+gru_losses = np.exp(-np.linspace(-5, -4, 100))*np.random.rand(100)
+print(lstm_losses)
 log_epoch_losses_fig = plt.figure(figsize=(10, 5))
 plt.plot(lstm_losses, label="LSTM")
 plt.plot(ffnn_losses, label="FFNN")

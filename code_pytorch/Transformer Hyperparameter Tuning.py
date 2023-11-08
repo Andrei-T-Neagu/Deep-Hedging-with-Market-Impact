@@ -15,18 +15,18 @@ from scipy.stats import ttest_ind
 def count_parameters(agent):
     return sum(p.numel() for p in agent.model.parameters() if p.requires_grad)
 
-nbs_point_traj = 31
-batch_size = 512
+nbs_point_traj = 53
+batch_size = 256
 train_size = 100000
 test_size = 100000
 valid_size = 100000
-epochs = 1
+epochs = 25
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
 params_vect = [0.1, 0.1898]
 S_0 = 1000
-T = 30/252
+T = 252/252
 alpha = 1.02
 beta = 0.98
 loss_type = "RSMSE"
@@ -38,7 +38,7 @@ nbs_units = 256
 lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
-lambdas = [1, 1]
+lambdas = [-1, -1]
 
 name_ffnn = 'code_pytorch/ffnn_model'
 name_lstm = 'code_pytorch/lstm_model'
@@ -79,7 +79,7 @@ for episode in range(valid_size):
 test_set = torch.permute(test_set, (1, 0))
 valid_set = torch.permute(valid_set, (1, 0))
 
-"""MAX PARAMETERS TRANSFORMER:
+"""MAX PARAMETERS TRANSFORMER 31 POINTS:
 batch_size = 512 | nbs_layers = 4 | nbs_units = 128
 batch_size = 512 | nbs_layers = 2 | nbs_units = 256
 
@@ -93,16 +93,40 @@ batch_size = 128 | nbs_layers = 2 | nbs_units = 1024
 batch_size = 64 | nbs_layers = 10 | nbs_units = 512
 batch_size = 64 | nbs_layers = 5 | nbs_units = 1024
 """
-hyperparameters = [{"batch_size":512, "nbs_layers":4, "nbs_units":128},
-                   {"batch_size":512, "nbs_layers":2, "nbs_units":256},
-                   {"batch_size":256, "nbs_layers":4, "nbs_units":256},
-                   {"batch_size":256, "nbs_layers":2, "nbs_units":256},
-                   {"batch_size":128, "nbs_layers":10, "nbs_units":256},
-                   {"batch_size":128, "nbs_layers":5, "nbs_units":512},
-                   {"batch_size":128, "nbs_layers":2, "nbs_units":1024},
-                   {"batch_size":64, "nbs_layers":10, "nbs_units":512},
-                   {"batch_size":64, "nbs_layers":5, "nbs_units":1024}
-                   ]
+
+"""MAX PARAMETERS TRANSFORMER 53 POINTS:
+
+batch_size = 256 | nbs_layers = 4 | nbs_units = 64 | num_heads = 4
+batch_size = 256 | nbs_layers = 2 | nbs_units = 128 | num_heads = 8
+
+batch_size = 128 | nbs_layers = 4 | nbs_units = 128 | num_heads = 8
+batch_size = 128 | nbs_layers = 2 | nbs_units = 256 | num_heads = 8
+
+batch_size = 64 | nbs_layers = 6 | nbs_units = 128 | num_heads = 8
+batch_size = 64 | nbs_layers = 4 | nbs_units = 256 | num_heads = 8
+batch_size = 64 | nbs_layers = 2 | nbs_units = 256 | num_heads = 8
+"""
+
+hyperparameters = [
+                   {"batch_size":64, "nbs_layers":4, "nbs_units":256, "num_heads":8},
+                #    {"batch_size":512, "nbs_layers":4, "nbs_units":128, "num_heads":4},
+                #    {"batch_size":512, "nbs_layers":2, "nbs_units":256, "num_heads":4},
+                   {"batch_size":256, "nbs_layers":4, "nbs_units":256, "num_heads":4},
+                   {"batch_size":256, "nbs_layers":2, "nbs_units":256, "num_heads":4},
+                   {"batch_size":128, "nbs_layers":6, "nbs_units":128, "num_heads":4},
+                   {"batch_size":128, "nbs_layers":4, "nbs_units":256, "num_heads":4},
+                   {"batch_size":64, "nbs_layers":6, "nbs_units":64, "num_heads":4},
+                   {"batch_size":64, "nbs_layers":4, "nbs_units":128, "num_heads":4},
+
+                   {"batch_size":512, "nbs_layers":4, "nbs_units":128, "num_heads":8},
+                   {"batch_size":512, "nbs_layers":2, "nbs_units":256, "num_heads":8},
+                   {"batch_size":256, "nbs_layers":4, "nbs_units":256, "num_heads":8},
+                   {"batch_size":256, "nbs_layers":2, "nbs_units":256, "num_heads":8},
+                   {"batch_size":128, "nbs_layers":6, "nbs_units":128, "num_heads":8},
+                   {"batch_size":128, "nbs_layers":4, "nbs_units":256, "num_heads":8},
+                   {"batch_size":64, "nbs_layers":6, "nbs_units":64, "num_heads":8},
+                   {"batch_size":64, "nbs_layers":4, "nbs_units":128, "num_heads":8},
+                  ]
 
 config_losses_per_epoch = []
 config_test_losses = []
@@ -123,7 +147,7 @@ for i, config in enumerate(hyperparameters):
     training_start = datetime.datetime.now()
 
     agent_trans = DeepAgentTransformer.DeepAgent(nbs_point_traj, config["batch_size"], r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
-                loss_type, option_type, position_type, strike, V_0, config["nbs_layers"], config["nbs_units"], lr, prepro_stock,
+                loss_type, option_type, position_type, strike, V_0, config["nbs_layers"], config["nbs_units"], config["num_heads"], lr, prepro_stock,
                 nbs_shares, lambdas, name=name_transformer)
 
     num_parameters.append(count_parameters(agent_trans))

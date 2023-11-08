@@ -35,7 +35,7 @@ num_heads = 8
 lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
-lambdas = [1, 1] # impact persistence of 0.37
+lambdas = [-1, -1] 
 
 name_ffnn = 'code_pytorch/ffnn_model'
 name_lstm = 'code_pytorch/lstm_model'
