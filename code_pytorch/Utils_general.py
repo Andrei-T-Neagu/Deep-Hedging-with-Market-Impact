@@ -119,14 +119,14 @@ def print_stats(hedging_err, deltas, loss_type, model_name, V_0, riskaversion=99
 # -------------------------------------------------------------------------------------------------#
 # S_T          : normalize stock prices
 # strike       : real value of the strike price
-# option_type  : {"Call", "Put"}
+# option_type  : {"call", "put"}
 # -------------------------------------------------------------------------------------------------#
 def payoff_liability_func(underlying_unorm_prices, strike, option_type, freq_obs_equal_freq_rebal, barrier):
     # single asset
     S_T = underlying_unorm_prices[-1, :]
-    if (option_type == "Call"):
+    if (option_type == "call"):
         payoff = np.maximum(S_T - strike, 0)
-    elif (option_type == "Put"):
+    elif (option_type == "put"):
         payoff = np.maximum(strike - S_T, 0)
     elif (option_type == "Lookback_fixed_strike_put"):
         payoff = np.maximum(strike - np.amin(underlying_unorm_prices, axis=0), 0)
@@ -249,19 +249,19 @@ def delta_hedge_res(St_traj, r_borrow, r_lend, sigma, T, alpha, beta, option_typ
 
     deltas = np.zeros([time_vect_len - 1, nb_traj])
 
-    if (position_type == "Long"):
+    if (position_type == "long"):
         V_t[0, :] = -V_0 * np.ones(nb_traj)
 
     # - if short, you receive the premium that you put in the bank
-    elif (position_type == "Short"):
+    elif (position_type == "short"):
         V_t[0, :] = V_0 * np.ones(nb_traj)
 
     for t in range(1, time_vect_len):
 
-        if option_type == 'Call':
+        if option_type == 'call':
             deltas[t - 1, :] = nbs_shares * BS_delta(St_traj[t - 1, :], T, (r_borrow + r_lend) / 2, sigma, strike, 1)
 
-        elif option_type == 'Put':
+        elif option_type == 'put':
             deltas[t - 1, :] = nbs_shares * BS_delta(St_traj[t - 1, :], T, (r_borrow + r_lend) / 2, sigma, strike, -1)
 
         if (t - 1 == 0):
@@ -292,27 +292,27 @@ def delta_hedge_res(St_traj, r_borrow, r_lend, sigma, T, alpha, beta, option_typ
         L_t = liquid_func(St_traj[t, :], deltas[t - 1, :], alpha, beta, A_t[t, :], B_t[t, :])
         V_t = Y_t + L_t
 
-    if (position_type == "Short"):
-        if (option_type == "Call"):
+    if (position_type == "short"):
+        if (option_type == "call"):
             condition = np.greater_equal(cost_selling(St_traj[-1, :], nbs_shares, beta, B_t[-1, :]), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(St_traj[-1, :], deltas[-1, :] - nbs_shares, alpha,
                                                                  beta, A_t[-1, :], B_t[-1, :]) + nbs_shares * strike,
                                     Y_t + liquid_func(St_traj[-1, :], deltas[-1, :], alpha, beta, A_t[-1, :], B_t[-1, :]))
 
-        elif (option_type == "Put"):
+        elif (option_type == "put"):
             condition = np.less_equal(cost_selling(St_traj[-1, :], nbs_shares, beta, B_t[-1, :]), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(St_traj[-1, :], deltas[-1, :] + nbs_shares, alpha,
                                                                  beta, A_t[-1, :], B_t[-1, :]) - nbs_shares * strike,
                                     Y_t + liquid_func(St_traj[-1, :], deltas[-1, :], alpha, beta, A_t[-1, :], B_t[-1, :]))
 
-    elif (position_type == "Long"):
-        if (option_type == "Call"):
+    elif (position_type == "long"):
+        if (option_type == "call"):
             condition = np.greater_equal(cost_selling(St_traj[-1, :], nbs_shares, beta, B_t[-1, :]), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(St_traj[-1, :], deltas[-1, :] + nbs_shares, alpha,
                                                                  beta, A_t[-1, :], B_t[-1, :]) - nbs_shares * strike,
                                     Y_t + liquid_func(St_traj[-1, :], deltas[-1, :], alpha, beta, A_t[-1, :], B_t[-1, :]))
 
-        elif (option_type == "Put"):
+        elif (option_type == "put"):
             condition = np.less_equal(cost_selling(St_traj[-1, :], nbs_shares, beta, B_t[-1, :]), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(St_traj[-1, :], deltas[-1, :] - nbs_shares, alpha,
                                                                  beta, A_t[-1, :], B_t[-1, :]) + nbs_shares * strike,
@@ -328,15 +328,15 @@ def delta_hedge_res(St_traj, r_borrow, r_lend, sigma, T, alpha, beta, option_typ
 # Function to compute delta-hedging results
 # - currently working with:
 #    - Dynamics: BSM only
-#    - Option  : Call only
+#    - Option  : call only
 def delta_hedge(nbs_point_traj, test_paths, r_borrow, r_lend, mu, sigma, S_0, T, alpha, beta,
                 option_type, position_type, strike, V_0, nbs_shares):
     # - if long, you buy the option by borrowing V_0 from bank
-    if (position_type == "Long"):
+    if (position_type == "long"):
         V_t = -V_0
 
     # - if short, you receive the premium that you put in the bank
-    elif (position_type == "Short"):
+    elif (position_type == "short"):
         V_t = V_0
 
     N = nbs_point_traj - 1
@@ -346,9 +346,9 @@ def delta_hedge(nbs_point_traj, test_paths, r_borrow, r_lend, mu, sigma, S_0, T,
 
     for t in range(N):  # loop over time-step
         # compute time-t hedging strategy
-        if (option_type == "Call"):
+        if (option_type == "call"):
             deltas[t, :, 0] = nbs_shares * BS_delta(S_t, T - t * h, (r_borrow + r_lend) / 2, sigma, strike, 1)
-        elif (option_type == "Put"):
+        elif (option_type == "put"):
             deltas[t, :, 0] = nbs_shares * BS_delta(S_t, T - t * h, (r_borrow + r_lend) / 2, sigma, strike, -1)
 
         # A) Update bank account value
@@ -371,27 +371,27 @@ def delta_hedge(nbs_point_traj, test_paths, r_borrow, r_lend, mu, sigma, S_0, T,
         V_t = Y_t + L_t
 
         # Compute hedging error
-    if (position_type == "Short"):
-        if (option_type == "Call"):
+    if (position_type == "short"):
+        if (option_type == "call"):
             condition = np.greater_equal(cost_selling(S_t, nbs_shares, beta), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(S_t, deltas[-1, :, 0] - nbs_shares, alpha,
                                                                  beta) + nbs_shares * strike,
                                     Y_t + liquid_func(S_t, deltas[-1, :, 0], alpha, beta))
 
-        elif (option_type == "Put"):
+        elif (option_type == "put"):
             condition = np.less_equal(cost_selling(S_t, nbs_shares, beta), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(S_t, deltas[-1, :, 0] + nbs_shares, alpha,
                                                                  beta) - nbs_shares * strike,
                                     Y_t + liquid_func(S_t, deltas[-1, :, 0], alpha, beta))
 
-    elif (position_type == "Long"):
-        if (option_type == "Call"):
+    elif (position_type == "long"):
+        if (option_type == "call"):
             condition = np.greater_equal(cost_selling(S_t, nbs_shares, beta), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(S_t, deltas[-1, :, 0] + nbs_shares, alpha,
                                                                  beta) - nbs_shares * strike,
                                     Y_t + liquid_func(S_t, deltas[-1, :, 0], alpha, beta))
 
-        elif (option_type == "Put"):
+        elif (option_type == "put"):
             condition = np.less_equal(cost_selling(S_t, nbs_shares, beta), nbs_shares * strike)
             hedging_gain = np.where(condition, Y_t + liquid_func(S_t, deltas[-1, :, 0] - nbs_shares, alpha,
                                                                  beta) + nbs_shares * strike,
@@ -496,11 +496,11 @@ def MertonOption(s, K, r, tau, sigma, lambda_, gamma, delta):
 def test_hedging_strategy_new(nbs_point_traj, deltas, paths, strike, T, r_borrow, r_lend, alpha, beta,
                               option_type, position_type, V_0, nbs_shares):
     # - if long, you buy the option by borrowing V_0 from bank
-    if (position_type == "Long"):
+    if (position_type == "long"):
         V_t = -V_0
 
     # - if short, you receive the premium that you put in the bank
-    elif (position_type == "Short"):
+    elif (position_type == "short"):
         V_t = V_0
 
     N = nbs_point_traj - 1
@@ -537,14 +537,14 @@ def test_hedging_strategy_new(nbs_point_traj, deltas, paths, strike, T, r_borrow
 # -------------------------------------------------------------------------------------------------#
 # paths        : unormalized stock price
 # strike       : real value of the strike price
-# option_type  : {"Call", "Put"}
+# option_type  : {"call", "put"}
 # -------------------------------------------------------------------------------------------------#
 def payoff_func(paths, strike, option_type, barrier=-999999999):
     # single asset
-    if (option_type == "Call"):
+    if (option_type == "call"):
         S_T = paths[-1, :]
         payoff = np.maximum(S_T - strike, 0)
-    elif (option_type == "Put"):
+    elif (option_type == "put"):
         S_T = paths[-1, :]
         payoff = np.maximum(strike - S_T, 0)
     elif (option_type == "Lookback_fixed_strike_put"):
@@ -570,8 +570,8 @@ def payoff_func(paths, strike, option_type, barrier=-999999999):
 # - global_hedge: vector of global hedge corresponding to the spot prices
 def plot_hedge(spot_prices, delta_hedge, global_hedge, title_name, save_name):
     fig, ax = plt.subplots(figsize=(15, 10))
-    ax.plot(spot_price_vect, delta_hedge_vect, label="Delta hedge")
-    ax.plot(spot_price_vect, what_ever_hedge, label="Global hedge")
+    ax.plot(spot_prices, delta_hedge, label="Delta hedge")
+    ax.plot(spot_prices, global_hedge, label="Global hedge")
     plt.xlabel('Spot price', fontsize=16)
     plt.ylabel('Share of stock', fontsize=16)
     plt.xticks(fontsize=12)

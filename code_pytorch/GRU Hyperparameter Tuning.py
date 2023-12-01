@@ -10,6 +10,10 @@ import DeepAgent
 import DeepAgentTransformer
 import DeepAgentLSTM
 import DeepAgentGRU
+import DeepAgentLight
+import DeepAgentTransformerLight
+import DeepAgentLSTMLight
+import DeepAgentGRULight
 from scipy.stats import ttest_ind
 
 def count_parameters(agent):
@@ -35,64 +39,76 @@ position_type = "short"
 strike = 1000
 nbs_layers = 2
 nbs_units = 256
-lr = 0.0001
+lr = 0.00001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
 lambdas = [-1, -1]
 
-name_ffnn = 'code_pytorch/ffnn_model'
-name_lstm = 'code_pytorch/lstm_model'
-name_gru = 'code_pytorch/gru_model'
-name_transformer = 'code_pytorch/transformer_model'
+light = True
+generate_valid_dataset = False
+generate_test_dataset = False
 
-if (option_type == 'Call'):
+if light:
+    path_prefix = "code_pytorch/hyperparameter_tuning/light/"
+
+    name_gru = 'code_pytorch/gru_model_light'
+else:
+    path_prefix = "code_pytorch/hyperparameter_tuning/"
+
+    name_gru = 'code_pytorch/gru_model'
+
+if (option_type == 'call'):
     V_0 = Utils_general.BlackScholes_price(S_0, T, r_borrow, params_vect[1], strike, 1)
 else:
     V_0 = Utils_general.BlackScholes_price(S_0, T, r_borrow, params_vect[1], strike, -1)
 
-# Creating test dataset
-mu, sigma = params_vect
-N = nbs_point_traj - 1
-dt = T / N
+if generate_test_dataset:
+    # Creating test dataset
+    mu, sigma = params_vect
+    N = nbs_point_traj - 1
+    dt = T / N
+
+    test_set = torch.ones(test_size, nbs_point_traj)
+    print("Generating Unbatched Test Data Set")
+    for episode in range(test_size):
+        if episode % 100000 == 0:
+            print("Generated: " + str(episode) + "/" + str(test_size) + " paths")
+        for timestep in range(nbs_point_traj):
+            if timestep == 0:
+                S_t = S_0 
+            else:
+                Z = torch.randn(1)
+                S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
+            test_set[episode, timestep] = S_t
+    
+    test_set = torch.permute(test_set, (1, 0))
+    torch.save(test_set, "/home/a_eagu/Deep-Hedging-with-Market-Impact/code_pytorch/unbatched_test_set")
+
+if generate_valid_dataset:
+    valid_set = torch.ones(valid_size, nbs_point_traj)
+    print("Generating Unbatched Validation Data Set")
+    for episode in range(valid_size):
+        if episode % 100000 == 0:
+            print("Generated: " + str(episode) + "/" + str(valid_size) + " paths")
+        for timestep in range(nbs_point_traj):
+            if timestep == 0:
+                S_t = S_0 
+            else:
+                Z = torch.randn(1)
+                S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
+            valid_set[episode, timestep] = S_t
+
+    valid_set = torch.permute(valid_set, (1, 0))
+    torch.save(valid_set, "/home/a_eagu/Deep-Hedging-with-Market-Impact/code_pytorch/unbatched_valid_set")
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-test_set = torch.ones(test_size, nbs_point_traj, device=device)
-for episode in range(test_size):
-    for timestep in range(nbs_point_traj):
-        if timestep == 0:
-            S_t = S_0 
-        else:
-            Z = torch.randn(1, device=device)
-            S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
-        test_set[episode, timestep] = S_t
+test_set = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/code_pytorch/unbatched_test_set")
+test_set = test_set.to(device)
 
-valid_set = torch.ones(valid_size, nbs_point_traj, device=device)
-for episode in range(valid_size):
-    for timestep in range(nbs_point_traj):
-        if timestep == 0:
-            S_t = S_0 
-        else:
-            Z = torch.randn(1, device=device)
-            S_t = S_t * torch.exp((mu - sigma ** 2 / 2) * dt + sigma * math.sqrt(dt) * Z)
-        valid_set[episode, timestep] = S_t
+valid_set = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/code_pytorch/unbatched_valid_set")
+valid_set = valid_set.to(device)
 
-test_set = torch.permute(test_set, (1, 0))
-valid_set = torch.permute(valid_set, (1, 0))
-
-"""MAX PARAMETERS TRANSFORMER 31 POINTS:
-batch_size = 512 | nbs_layers = 4 | nbs_units = 128
-batch_size = 512 | nbs_layers = 2 | nbs_units = 256
-
-batch_size = 256 | nbs_layers = 4 | nbs_units = 256
-batch_size = 256 | nbs_layers = 2 | nbs_units = 256 
-
-batch_size = 128 | nbs_layers = 10 | nbs_units = 256
-batch_size = 128 | nbs_layers = 5 | nbs_units = 512
-batch_size = 128 | nbs_layers = 2 | nbs_units = 1024
-
-batch_size = 64 | nbs_layers = 10 | nbs_units = 512
-batch_size = 64 | nbs_layers = 5 | nbs_units = 1024
-"""
 hyperparameters = [
                    {"batch_size":512, "nbs_layers":6, "nbs_units":512},
                    {"batch_size":512, "nbs_layers":6, "nbs_units":256},
@@ -124,20 +140,33 @@ num_parameters = []
 for i, config in enumerate(hyperparameters):
 
     test_index = test_size%config["batch_size"]
-    test_set_batched = test_set[:, :-test_index].view(nbs_point_traj, int(test_size/config["batch_size"]),  config["batch_size"])
+    if test_index != 0:
+        test_set_batched = test_set[:, :-test_index].view(nbs_point_traj, int(test_size/config["batch_size"]),  config["batch_size"])
+    else:
+        test_set_batched = test_set.view(nbs_point_traj, int(test_size/config["batch_size"]),  config["batch_size"])
     test_set_batched = torch.permute(test_set_batched, (1,0,2))
 
     valid_index = valid_size%config["batch_size"]
-    valid_set_batched = valid_set[:, :-valid_index].view(nbs_point_traj, int(valid_size/config["batch_size"]),  config["batch_size"])
+    if test_index != 0:
+        valid_set_batched = valid_set[:, :-valid_index].view(nbs_point_traj, int(valid_size/config["batch_size"]),  config["batch_size"])
+    else:
+        valid_set_batched = valid_set.view(nbs_point_traj, int(valid_size/config["batch_size"]),  config["batch_size"])
     valid_set_batched = torch.permute(valid_set_batched, (1,0,2))
     
     training_start = datetime.datetime.now()
 
-    agent_gru = DeepAgentGRU.DeepAgent(nbs_point_traj, config["batch_size"], r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
-                loss_type, option_type, position_type, strike, V_0, config["nbs_layers"], config["nbs_units"], lr, prepro_stock,
-                nbs_shares, lambdas, name=name_gru)
+    if light:
+        agent_gru = DeepAgentGRULight.DeepAgent(nbs_point_traj, config["batch_size"], r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
+                    loss_type, option_type, position_type, strike, V_0, config["nbs_layers"], config["nbs_units"], lr, prepro_stock,
+                    nbs_shares, lambdas, name=name_gru)
+    else:
+        agent_gru = DeepAgentGRU.DeepAgent(nbs_point_traj, config["batch_size"], r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
+                    loss_type, option_type, position_type, strike, V_0, config["nbs_layers"], config["nbs_units"], lr, prepro_stock,
+                    nbs_shares, lambdas, name=name_gru)
 
     num_parameters.append(count_parameters(agent_gru))
+
+    print("CURRENTLY TRAINING: " + str(config))
 
     all_losses_gru, gru_losses = agent_gru.train(train_size = train_size, epochs=epochs)
     training_times.append(datetime.datetime.now()-training_start)
@@ -165,7 +194,7 @@ for i, config in enumerate(hyperparameters):
 
 sorted_valid_indices = np.argsort(config_valid_losses).tolist()
 
-with open("code_pytorch/hyperparameter_tuning/gru_hyperparameter_tuning.txt", "w") as hyperparameter_tune_file:
+with open(path_prefix + "gru_hyperparameter_tuning.txt", "w") as hyperparameter_tune_file:
     # Writing data to a file
     hyperparameter_tune_file.write("|---------------------------Hyperparameter Tuning for GRU for {epochs:d} Epochs------------------------|\n".format(epochs=epochs))
     for i in sorted_valid_indices:
@@ -178,4 +207,4 @@ plt.legend()
 plt.xlabel("Epoch")
 plt.ylabel("Error")
 plt.title("Error per Epoch of Hyperparameter Search for GRU Architecture")
-plt.savefig("code_pytorch/hyperparameter_tuning/gru_hyperparameter_search.png")
+plt.savefig(path_prefix + "gru_hyperparameter_search.png")

@@ -6,17 +6,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import Utils_general
+import torch.optim.lr_scheduler as lr_scheduler
 
 class Transformer(nn.Module):
     
-    def __init__(self, in_features, seq_length, d_model, dim_feedforward, n_heads, num_layers):
+    def __init__(self, in_features, seq_length, d_model, dim_feedforward, n_heads, num_layers, dropout=0.5):
         
         super().__init__()
 
         self.linear1 = nn.Linear(in_features=in_features, out_features=d_model)
         self.positional_encoding = nn.Parameter(torch.rand(seq_length, d_model))
         
-        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward, batch_first=True, dropout=dropout)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         
         self.final_linear = nn.Linear(in_features=d_model, out_features=1)
@@ -33,7 +34,7 @@ class Transformer(nn.Module):
 class DeepAgent():
     
     def __init__(self, nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
-                 loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, num_heads, lr, prepro_stock,
+                 loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, num_heads, lr, dropout, prepro_stock,
                  nbs_shares, lambdas, name='model'):
         
         self.nbs_point_traj = nbs_point_traj
@@ -69,7 +70,7 @@ class DeepAgent():
         # Device the computations will take place on
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Model
-        self.model = Transformer(in_features=6, seq_length=self.N, d_model=self.nbs_units, dim_feedforward=self.nbs_units, n_heads=self.num_heads, num_layers=self.nbs_layers).to(self.device)
+        self.model = Transformer(in_features=6, seq_length=self.N, d_model=self.nbs_units, dim_feedforward=self.nbs_units, n_heads=self.num_heads, num_layers=self.nbs_layers, dropout=dropout).to(self.device)
         
         self.name = name
         print("Initial value of the portfolio: ", V_0)
@@ -286,7 +287,7 @@ class DeepAgent():
             loss = torch.sqrt(torch.mean(torch.square(torch.where(hedging_error > 0, hedging_error, 0)))) / self.nbs_shares
         return loss
 
-    def train(self, train_size, epochs):
+    def train(self, train_size, epochs, lr_schedule = True):
         start = dt.datetime.now()  # compute time
         self.losses_epochs = np.array([])
         best_loss = 99999999
@@ -297,8 +298,12 @@ class DeepAgent():
         worse_loss = 0
         early_stop = False
 
+        self.model.train()
+
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        if lr_schedule:
+            self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=0.1, total_iters=epochs)
 
         # Loop while we haven't reached the max epoch and early stopping criteria is not reached
         while (epoch < epochs):
@@ -334,6 +339,9 @@ class DeepAgent():
                 maxAt = np.append(maxAt, np.max(A_t_tensor.detach().cpu().numpy()))
                 maxBt = np.append(maxBt, np.max(B_t_tensor.detach().cpu().numpy()))
 
+            if lr_schedule:
+                self.scheduler.step()
+
             # print("DELTA_T_NEXT: " , self.delta_t_next)
             # print("STRATEGY: ", strategy.detach().numpy()[:, 10, -1])
 
@@ -345,11 +353,13 @@ class DeepAgent():
                 print("Epoch: %d, %s, Train Loss: %.3f" % (epoch + 1, self.loss_type, self.losses_epochs[epoch]))
                 print("Proportion of exercise: ", np.mean(exercised))
                 print("Strike: ", self.strike)
+                if lr_schedule:
+                    print("Learning rate: ", str(self.optimizer.param_groups[0]["lr"]))
             
             # Save the model if it's better
-            if self.losses_epochs[epoch] < best_loss:
-                best_loss = self.losses_epochs[epoch]
-                torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
+            # if self.losses_epochs[epoch] < best_loss:
+            #     best_loss = self.losses_epochs[epoch]
+            #     torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
             
             # # Early stop after training on more epoch
             # if early_stop:
@@ -363,6 +373,8 @@ class DeepAgent():
 
             epoch += 1
 
+        torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
+
         return all_losses, self.losses_epochs
     
     def test(self, test_size, test_set):
@@ -372,6 +384,8 @@ class DeepAgent():
         V_t_tensor_pred = []
         A_t_tensor_pred = []
         B_t_tensor_pred = []
+
+        self.model.eval()
 
         for i in range(int(test_size/self.batch_size)):
             with torch.no_grad():

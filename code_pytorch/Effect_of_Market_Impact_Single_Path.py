@@ -12,19 +12,19 @@ import DeepAgentLSTM as DeepAgentLSTM
 import DeepAgentGRU as DeepAgentGRU
 from scipy.stats import ttest_ind
 
-nbs_point_traj = 31
+nbs_point_traj = 9
 batch_size = 256
 train_size = 100000
 test_size = 100000
-epochs = 10
+epochs = 100
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
 params_vect = [0.1, 0.1898]
 S_0 = 1000
-T = 30/252
-alpha = 1.01
-beta = 0.99
+T = 1/252
+alpha = 1.001
+beta = 0.999
 loss_type = "RSMSE"
 option_type = "call"
 position_type = "short"
@@ -35,6 +35,10 @@ lr = 0.0001
 prepro_stock = "log-moneyness"
 nbs_shares = 1
 lambdas = [-1, -1]
+dropout = 0
+
+light = False
+lr_schedule = True
 
 Ts = [1/252]
 #Ts = [252/252, 30/252, 1/252]
@@ -83,11 +87,11 @@ for T in Ts:
             
             name = "code_pytorch/effect_of_market_impact_single_path/{time_period_folder}/{loss_type}_hedging_{impact:.4f}_market_impact_single_path_{time_period}_{persistence:.1f}_persistence".format(time_period_folder=time_period, loss_type="quadratic" if loss_type=="RMSE" else "semi_quadratic", impact=impact, time_period=time_period, persistence=persistence)
             agent = DeepAgent.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
-                            loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
+                            loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, dropout, prepro_stock,
                             nbs_shares, lambdas, name=name)
 
             print("START FFNN {loss_type} - {impact:.4f} IMPACT - {persistence:.1f} Persistence".format(loss_type=loss_type, impact=impact, persistence=persistence))
-            all_losses, epoch_losses = agent.train(train_size = train_size, epochs=epochs)
+            all_losses, epoch_losses = agent.train(train_size = train_size, epochs=epochs, lr_schedule=lr_schedule)
 
             print("DONE FFNN {loss_type} - {impact:.4f} IMPACT - {persistence:.1f} Persistence".format(loss_type=loss_type, impact=impact, persistence=persistence))
             agent.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/{name}".format(name=name))
@@ -131,7 +135,7 @@ for T in Ts:
             def count_parameters(agent):
                 return sum(p.numel() for p in agent.model.parameters() if p.requires_grad)
 
-        deltas_DH, hedging_err_DH = Utils_general.delta_hedge_res(S_t[:,max_error_index:max_error_index+1], r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type="Call", position_type="Short", strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas)
+        deltas_DH, hedging_err_DH = Utils_general.delta_hedge_res(S_t[:,max_error_index:max_error_index+1], r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type=option_type, position_type=position_type, strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas)
 
         fig = plt.figure(figsize=(10, 5))
         plt.plot(S_t[:,max_error_index], label="Stock prices path")

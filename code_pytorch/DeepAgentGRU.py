@@ -6,10 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import Utils_general
+import torch.optim.lr_scheduler as lr_scheduler
 
 class GRU_multilayer_cell(nn.Module):
     
-    def __init__(self, batch_size, input_size, hidden_size, num_layers, device):
+    def __init__(self, batch_size, input_size, hidden_size, num_layers, device, dropout=0.5):
         
         super().__init__()
 
@@ -19,6 +20,8 @@ class GRU_multilayer_cell(nn.Module):
         
         self.linear = nn.Linear(in_features=hidden_size, out_features=1)
 
+        self.dropout = nn.Dropout(dropout)
+
         self.batch_size = batch_size
         self.nbs_units = hidden_size
         self.device = device
@@ -27,9 +30,11 @@ class GRU_multilayer_cell(nn.Module):
     def forward(self, x, hs):
         
         hs[0] = self.first_gru_cell(x, hs[0])
+        hs[0] = self.dropout(hs[0])
         if self.num_layers > 1:
             for i in range(self.num_layers-1):
                 hs[i+1] = self.gru_cells[i](hs[i], hs[i+1])
+                hs[i+1] = self.dropout(hs[i+1])
             x = self.linear(hs[i+1])
         else:
             x = self.linear(hs[0])
@@ -38,7 +43,7 @@ class GRU_multilayer_cell(nn.Module):
 class DeepAgent():
     
     def __init__(self, nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
-                 loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, prepro_stock,
+                 loss_type, option_type, position_type, strike, V_0, nbs_layers, nbs_units, lr, dropout, prepro_stock,
                  nbs_shares, lambdas, name='model'):
         
         self.nbs_point_traj = nbs_point_traj
@@ -73,7 +78,7 @@ class DeepAgent():
         # Device the computations will take place on
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Model
-        self.model = GRU_multilayer_cell(batch_size=self.batch_size, input_size=6, hidden_size=self.nbs_units, num_layers=self.nbs_layers, device=self.device).to(self.device)
+        self.model = GRU_multilayer_cell(batch_size=self.batch_size, input_size=6, hidden_size=self.nbs_units, num_layers=self.nbs_layers, device=self.device, dropout=dropout).to(self.device)
 
         self.name = name
         print("Initial value of the portfolio: ", V_0)
@@ -275,7 +280,7 @@ class DeepAgent():
             loss = torch.sqrt(torch.mean(torch.square(torch.where(hedging_error > 0, hedging_error, 0)))) / self.nbs_shares
         return loss
 
-    def train(self, train_size, epochs):
+    def train(self, train_size, epochs, lr_schedule = True):
         start = dt.datetime.now()  # compute time
         self.losses_epochs = np.array([])
         best_loss = 99999999
@@ -286,8 +291,12 @@ class DeepAgent():
         worse_loss = 0
         early_stop = False
 
+        self.model.train()
+
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        if lr_schedule:
+            self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=0.1, total_iters=epochs)
 
         # Loop while we haven't reached the max epoch and early stopping criteria is not reached
         while (epoch < epochs):
@@ -327,6 +336,9 @@ class DeepAgent():
                 maxAt = np.append(maxAt, np.max(A_t_tensor.detach().cpu().numpy()))
                 maxBt = np.append(maxBt, np.max(B_t_tensor.detach().cpu().numpy()))
 
+            if lr_schedule:
+                self.scheduler.step()
+
             # print("DELTA_T_NEXT: " , self.delta_t_next)
             # print("STRATEGY: ", strategy.detach().numpy()[:, 10, -1])
 
@@ -338,11 +350,13 @@ class DeepAgent():
                 print("Epoch: %d, %s, Train Loss: %.3f" % (epoch + 1, self.loss_type, self.losses_epochs[epoch]))
                 print("Proportion of exercise: ", np.mean(exercised))
                 print("Strike: ", self.strike)
+                if lr_schedule:
+                    print("Learning rate: ", str(self.optimizer.param_groups[0]["lr"]))
             
             # Save the model if it's better
-            if self.losses_epochs[epoch] < best_loss:
-                best_loss = self.losses_epochs[epoch]
-                torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
+            # if self.losses_epochs[epoch] < best_loss:
+            #     best_loss = self.losses_epochs[epoch]
+            #     torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
             
             # # Early stop after training on more epoch
             # if early_stop:
@@ -356,6 +370,8 @@ class DeepAgent():
 
             epoch += 1
         
+        torch.save(self.model, "/home/a_eagu/Deep-Hedging-with-Market-Impact/" + self.name)
+
         return all_losses, self.losses_epochs
     
     def test(self, test_size, test_set):
@@ -365,6 +381,8 @@ class DeepAgent():
         V_t_tensor_pred = []
         A_t_tensor_pred = []
         B_t_tensor_pred = []
+
+        self.model.eval()
 
         for i in range(int(test_size/self.batch_size)):
             with torch.no_grad():
