@@ -17,8 +17,8 @@ import DeepAgentGRULight
 from scipy.stats import wilcoxon
 from scipy.stats import ttest_ind
 
-nbs_point_traj = 13
-time_period = "year"
+nbs_point_traj = 9
+time_period = "day"
 batch_size = 256
 train_size = 100000
 test_size = 1000000
@@ -26,11 +26,11 @@ epochs = 100
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
-params_vect = [0.1, 0.1898]
+params_vect = [0.0892, 0.1952]
 S_0 = 1000
-T = 252/252
-alpha = 1.02
-beta = 0.98
+T = 1/252
+alpha = 1.002
+beta = 0.998
 loss_type = "RSMSE"
 option_type = "call"
 position_type = "short"
@@ -196,7 +196,7 @@ print("|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|")
 print("|-----------------------|---------------|---------------|---------------|")
 print("|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn))
 print("|-----------------------|---------------|---------------|---------------|")
-print("|---------------------T-test for smaller SMSE (Light vs Regular model)-----------_--------------|")
+print("|---------------------T-test for smaller SMSE (Light vs Regular model)--------------------------|")
 print("|\t\t\t|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|")
 print("|-----------------------|-----------------------|---------------|---------------|---------------|")
 print("|\tp-values:\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|".format(smse_trans, smse_gru, smse_lstm, smse_ffnn))
@@ -222,7 +222,7 @@ with open(path_prefix + "ModelComparison_" + str(nbs_point_traj) + ".txt", "w") 
 
 print()
 
-fig = plt.figure(figsize=(10, 5))
+fig = plt.figure(figsize=(15, 10))
 plt.hist(semi_square_hedging_err_gru_light, bins=50, label="GRU")
 plt.xlabel('Semi Squared Errors')
 plt.ylabel('Frequency')
@@ -237,7 +237,7 @@ ratios_lstm_worst = deltas_lstm[:,max_error_index,0]
 ratios_gru_worst = deltas_gru[:,max_error_index,0]
 ratios_trans_worst = deltas_trans[:, max_error_index,0]
 
-fig = plt.figure(figsize=(10, 5))
+fig = plt.figure(figsize=(15, 10))
 plt.plot(S_t_ffnn[:,max_error_index], label="Stock prices path")
 plt.xlabel('Time Steps')
 plt.ylabel('Stock Prices')
@@ -246,7 +246,7 @@ plt.legend()
 plt.title("Paths of stock prices for worst error scenario - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
 plt.savefig(path_prefix + "path_of_stock_prices_worst_losses_{time_period}.jpg".format(time_period=time_period))
 
-fig = plt.figure(figsize=(10, 5))
+fig = plt.figure(figsize=(15, 10))
 plt.plot(ratios_DH_worst, label="delta hedge")
 plt.plot(ratios_ffnn_worst, label="FFNN")
 plt.plot(ratios_lstm_worst, label="LSTM")
@@ -266,8 +266,8 @@ ratios_lstm_best = deltas_lstm[:,min_error_index,0]
 ratios_gru_best = deltas_gru[:,min_error_index,0]
 ratios_trans_best = deltas_trans[:, min_error_index,0]
 
-fig = plt.figure(figsize=(10, 5))
-plt.plot(S_t_ffnn[:,min_error_index], label="Stock prices path")
+fig = plt.figure(figsize=(15, 10))
+plt.plot(S_t_ffnn_light[:,min_error_index], label="Stock prices path")
 plt.xlabel('Time Steps')
 plt.ylabel('Stock Prices')
 plt.grid()
@@ -275,7 +275,7 @@ plt.legend()
 plt.title("Paths of stock prices for best error scenario - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
 plt.savefig(path_prefix + "path_of_stock_prices_best_error_{time_period}.jpg".format(time_period=time_period))
 
-fig = plt.figure(figsize=(10, 5))
+fig = plt.figure(figsize=(15, 10))
 plt.plot(ratios_DH_best, label="delta hedge")
 plt.plot(ratios_ffnn_best, label="FFNN")
 plt.plot(ratios_lstm_best, label="LSTM")
@@ -287,3 +287,63 @@ plt.grid()
 plt.legend()
 plt.title("Paths of hedge ratios of models for best error scenario - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
 plt.savefig(path_prefix + "path_of_ratios_models_best_error_{time_period}.jpg".format(time_period=time_period))
+
+#LIGHT MODELS
+
+max_error_index_light = np.argmax(hedging_err_ffnn_light)
+ratios_DH_worst_light, hedging_err_DH_worst_light = Utils_general.delta_hedge_res(S_t_ffnn[:,max_error_index_light:max_error_index_light+1], r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type=option_type, position_type=position_type, strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas)
+ratios_ffnn_worst_light = deltas_ffnn_light[:,max_error_index_light,0]
+ratios_lstm_worst_light = deltas_lstm_light[:,max_error_index_light,0]
+ratios_gru_worst_light = deltas_gru_light[:,max_error_index_light,0]
+ratios_trans_worst_light = deltas_trans_light[:, max_error_index_light,0]
+
+fig = plt.figure(figsize=(15, 10))
+plt.plot(S_t_ffnn_light[:,max_error_index_light], label="Stock prices path")
+plt.xlabel('Time Steps')
+plt.ylabel('Stock Prices')
+plt.grid()
+plt.legend()
+plt.title("Paths of stock prices for worst error scenario - Light models - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
+plt.savefig(path_prefix + "path_of_stock_prices_worst_losses_light_{time_period}.jpg".format(time_period=time_period))
+
+fig = plt.figure(figsize=(15, 10))
+plt.plot(ratios_DH_worst_light, label="delta hedge")
+plt.plot(ratios_ffnn_worst_light, label="FFNN")
+plt.plot(ratios_lstm_worst_light, label="LSTM")
+plt.plot(ratios_gru_worst_light, label="GRU")
+plt.plot(ratios_trans_worst_light, label="Transformer")
+plt.xlabel('Time Steps')
+plt.ylabel('Hedge Ratios')
+plt.grid()
+plt.legend()
+plt.title("Paths of hedge ratios of models for worst error scenario - Light models - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
+plt.savefig(path_prefix + "path_of_ratios_models_worst_error_light_{time_period}.jpg".format(time_period=time_period))
+
+min_error_index_light = np.argmin(hedging_err_ffnn_light)
+ratios_DH_best_light, hedging_err_DH_best_light = Utils_general.delta_hedge_res(S_t_ffnn_light[:,min_error_index_light:min_error_index_light+1], r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type=option_type, position_type=position_type, strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas)
+ratios_ffnn_best_light = deltas_ffnn_light[:,min_error_index_light,0]
+ratios_lstm_best_light = deltas_lstm_light[:,min_error_index_light,0]
+ratios_gru_best_light = deltas_gru_light[:,min_error_index_light,0]
+ratios_trans_best_light = deltas_trans_light[:, min_error_index_light,0]
+
+fig = plt.figure(figsize=(15, 10))
+plt.plot(S_t_ffnn_light[:,min_error_index_light], label="Stock prices path")
+plt.xlabel('Time Steps')
+plt.ylabel('Stock Prices')
+plt.grid()
+plt.legend()
+plt.title("Paths of stock prices for best error scenario - Light models - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
+plt.savefig(path_prefix + "path_of_stock_prices_best_error_light_{time_period}.jpg".format(time_period=time_period))
+
+fig = plt.figure(figsize=(15, 10))
+plt.plot(ratios_DH_best_light, label="delta hedge")
+plt.plot(ratios_ffnn_best_light, label="FFNN")
+plt.plot(ratios_lstm_best_light, label="LSTM")
+plt.plot(ratios_gru_best_light, label="GRU")
+plt.plot(ratios_trans_best_light, label="Transformer")
+plt.xlabel('Time Steps')
+plt.ylabel('Hedge Ratios')
+plt.grid()
+plt.legend()
+plt.title("Paths of hedge ratios of models for best error scenario - Light models - Time Period: {time_period} - mu = {mu:.4f} and sigma = {sigma:.4f}".format(time_period=time_period, mu=params_vect[0], sigma=params_vect[1]))
+plt.savefig(path_prefix + "path_of_ratios_models_best_error_light_{time_period}.jpg".format(time_period=time_period))

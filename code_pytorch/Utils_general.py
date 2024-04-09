@@ -5,7 +5,7 @@ from scipy.stats import poisson
 from scipy.stats import kurtosis
 from scipy.stats import skew
 from scipy.stats import norm
-
+import math
 
 def n_timesteps_func(T, rebalancement_timeframe):
     if (rebalancement_timeframe == "daily"):
@@ -239,15 +239,23 @@ def cost_selling(S_t, x, beta, B = 0):
 
 # Function to compute delta-hedging using given trajectories of the geometric BM with resilience
 # set hab = [-1,-1] for no impact case
-def delta_hedge_res(St_traj, r_borrow, r_lend, sigma, T, alpha, beta, option_type, position_type, strike, V_0, nbs_shares, hab = [-1,-1]):
+def delta_hedge_res(St_traj, r_borrow, r_lend, sigma, T, alpha, beta, option_type, position_type, strike, V_0, nbs_shares, hab = [-1,-1], Leland=False):
 
     time_vect_len, nb_traj = St_traj.shape  # nb of time points (counting t=0), nb of trajectories
-    delta_t = T / (time_vect_len - 1)  # Maturity in years/nb of time intervals
+    N = time_vect_len - 1 # step-size
+    delta_t = T / N  # Maturity in years/nb of time intervals
+
+    if Leland:
+        B_t = 0
+        price_selling = strike * ((1 + 1 + B_t) ** beta - (1 + B_t) ** beta)
+        k = -(price_selling-strike)/strike
+        sigma = sigma*math.sqrt(1+math.sqrt(2/math.pi)*(k/(sigma*math.sqrt(delta_t))))
+
     V_t = np.zeros(St_traj.shape)
     A_t = np.zeros(St_traj.shape)
     B_t = np.zeros(St_traj.shape)
 
-    deltas = np.zeros([time_vect_len - 1, nb_traj])
+    deltas = np.zeros([N, nb_traj])
 
     if (position_type == "long"):
         V_t[0, :] = -V_0 * np.ones(nb_traj)
@@ -256,40 +264,39 @@ def delta_hedge_res(St_traj, r_borrow, r_lend, sigma, T, alpha, beta, option_typ
     elif (position_type == "short"):
         V_t[0, :] = V_0 * np.ones(nb_traj)
 
-    for t in range(1, time_vect_len):
-
+    for t in range(N):
         if option_type == 'call':
-            deltas[t - 1, :] = nbs_shares * BS_delta(St_traj[t - 1, :], T, (r_borrow + r_lend) / 2, sigma, strike, 1)
+            deltas[t, :] = nbs_shares * BS_delta(St_traj[t, :], T - t * delta_t, (r_borrow + r_lend) / 2, sigma, strike, 1)
 
         elif option_type == 'put':
-            deltas[t - 1, :] = nbs_shares * BS_delta(St_traj[t - 1, :], T, (r_borrow + r_lend) / 2, sigma, strike, -1)
+            deltas[t, :] = nbs_shares * BS_delta(St_traj[t, :], T - t * delta_t, (r_borrow + r_lend) / 2, sigma, strike, -1)
 
-        if (t - 1 == 0):
-            cashflow = liquid_func(St_traj[t - 1, :], -deltas[t - 1, :], alpha, beta, A_t[t - 1, :], B_t[t - 1, :])  # cashflow of first investment done
-            Y_t = V_t[t - 1, :] + cashflow  # time-0 amount in the bank account
+        if (t == 0):
+            cashflow = liquid_func(St_traj[t, :], -deltas[t, :], alpha, beta, A_t[t, :], B_t[t, :])  # cashflow of first investment done
+            Y_t = V_t[t, :] + cashflow  # time-0 amount in the bank account
             if hab[0] == -1:
-                A_t[t, :] = A_t[0, :]
+                A_t[t+1, :] = A_t[0, :]
             else:
-                A_t[t, :] = (A_t[t - 1, :] + np.maximum(deltas[t - 1, :], 0)) * np.exp(-hab[0] * delta_t)
+                A_t[t+1, :] = (A_t[t, :] + np.maximum(deltas[t, :], 0)) * np.exp(-hab[0] * delta_t)
             if hab[1] == -1:
-                B_t[t, :] = B_t[0, :]
+                B_t[t+1, :] = B_t[0, :]
             else:
-                B_t[t, :] = (B_t[t - 1, :] + np.maximum(-deltas[t - 1, :], 0)) * np.exp(-hab[1] * delta_t)
+                B_t[t+1, :] = (B_t[t, :] + np.maximum(-deltas[t, :], 0)) * np.exp(-hab[1] * delta_t)
 
         else:
-            diff_delta_t = deltas[t - 1, :] - deltas[t - 2, :]
-            cashflow = liquid_func(St_traj[t - 1, :], -diff_delta_t, alpha, beta, A_t[t - 1,:], B_t[t - 1,:])
+            diff_delta_t = deltas[t, :] - deltas[t - 1, :]
+            cashflow = liquid_func(St_traj[t, :], -diff_delta_t, alpha, beta, A_t[t,:], B_t[t,:])
             Y_t = int_rate_bank(Y_t, r_lend, r_borrow, delta_t) + cashflow  # time-t amount in the bank account
             if hab[0] == -1:
-                A_t[t, :] = A_t[0, :]
+                A_t[t+1, :] = A_t[0, :]
             else:
-                A_t[t, :] = (A_t[t - 1, :] + np.maximum(diff_delta_t, 0)) * np.exp(-hab[0] * delta_t)
+                A_t[t+1, :] = (A_t[t, :] + np.maximum(diff_delta_t, 0)) * np.exp(-hab[0] * delta_t)
             if hab[1] == -1:
-                B_t[t, :] = B_t[0, :]
+                B_t[t+1, :] = B_t[0, :]
             else:
-                B_t[t, :] = (B_t[t - 1, :] + np.maximum(-diff_delta_t, 0)) * np.exp(-hab[1] * delta_t)
+                B_t[t+1, :] = (B_t[t, :] + np.maximum(-diff_delta_t, 0)) * np.exp(-hab[1] * delta_t)
 
-        L_t = liquid_func(St_traj[t, :], deltas[t - 1, :], alpha, beta, A_t[t, :], B_t[t, :])
+        L_t = liquid_func(St_traj[t+1, :], deltas[t, :], alpha, beta, A_t[t+1, :], B_t[t+1, :])
         V_t = Y_t + L_t
 
     if (position_type == "short"):

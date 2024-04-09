@@ -47,18 +47,18 @@ nbs_shares = 1
 lambdas = [-1, -1]
 
 light = False
-generate_valid_dataset = False
-generate_test_dataset = False
+generate_valid_dataset = True
+generate_test_dataset = True
 lr_schedule = True
 
 if light:
     path_prefix = "code_pytorch/hyperparameter_tuning/light/"
 
-    name_ffnn = 'code_pytorch/ffnn_model_light' + str(time_period)
+    name_ffnn = 'code_pytorch/ffnn_model_light_' + str(time_period)
 else:
     path_prefix = "code_pytorch/hyperparameter_tuning/"
 
-    name_ffnn = 'code_pytorch/ffnn_model' + str(time_period)
+    name_ffnn = 'code_pytorch/ffnn_model_' + str(time_period)
 
 if (option_type == 'call'):
     V_0 = Utils_general.BlackScholes_price(S_0, T, r_borrow, params_vect[1], strike, 1)
@@ -230,4 +230,4 @@ plt.legend()
 plt.xlabel("Epoch")
 plt.ylabel("Error")
 plt.title("Error per Epoch of Hyperparameter Search for FFNN Architecture")
-plt.savefig(path_prefix + "ffnn_hyperparameter_search.png")
+plt.savefig(path_prefix + "ffnn_hyperparameter_search_" + str(time_period) + ".png")

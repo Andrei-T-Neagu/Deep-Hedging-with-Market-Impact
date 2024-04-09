@@ -15,12 +15,15 @@ import DeepAgentTransformerLight
 import DeepAgentLSTMLight
 import DeepAgentGRULight
 from scipy.stats import ttest_ind
+from scipy.stats import levene
+from scipy.stats import f
+
 
 nbs_point_traj = 9
 time_period = "day"
 T = 1/252
-alpha = 1.002
-beta = 0.998
+alpha = 1.000
+beta = 1.000
 
 batch_size = 256
 train_size = 100000
@@ -29,7 +32,7 @@ epochs = 100
 r_borrow = 0
 r_lend = 0
 stock_dyn = "BSM" 
-params_vect = [0.1, 0.1898]
+params_vect = [0.0892, 0.1952]
 S_0 = 1000
 loss_type = "RSMSE"
 option_type = "call"
@@ -45,7 +48,7 @@ nbs_shares = 1
 lambdas = [-1, -1] 
 
 generate_dataset = False
-light = True
+light = False
 lr_schedule = True
 
 if (option_type == 'call'):
@@ -119,21 +122,20 @@ all_losses_trans, trans_losses = agent_trans.train(train_size = train_size, epoc
 print("DONE TRANSFORMER")
 agent_trans.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_transformer)
 deltas_trans, hedging_err_trans, S_t_trans, V_t_trans, A_t_trans, B_t_trans = agent_trans.test(test_size=test_size, test_set=test_set)
-# print("ATTENTION WEIGHTS")
-# print(attention_weights.outputs)
 semi_square_hedging_err_trans = np.square(np.where(hedging_err_trans > 0, hedging_err_trans, 0))
+smse_trans = np.mean(semi_square_hedging_err_trans)
 rsmse_trans = np.sqrt(np.mean(semi_square_hedging_err_trans))
 
-print("TRANSFORMER TEST SET STATISTICS")
-S_t_trans_last = S_t_trans[-1, -5:]
-B_t_trans_last = B_t_trans[-1, -5:]
-print("S_t last: ", S_t_trans_last)
-print("B_t last: ", B_t_trans_last)
-S_t_trans_selling = S_t_trans_last * ((1 + 1 + B_t_trans_last) ** beta - (1 + B_t_trans_last) ** beta)
-print()
-print(S_t_trans_selling)
-print("MUST BE BIGGER THAN")
-print(strike)
+# print("TRANSFORMER TEST SET STATISTICS")
+# S_t_trans_last = S_t_trans[-1, -5:]
+# B_t_trans_last = B_t_trans[-1, -5:]
+# print("S_t last: ", S_t_trans_last)
+# print("B_t last: ", B_t_trans_last)
+# S_t_trans_selling = S_t_trans_last * ((1 + 1 + B_t_trans_last) ** beta - (1 + B_t_trans_last) ** beta)
+# print()
+# print(S_t_trans_selling)
+# print("MUST BE BIGGER THAN")
+# print(strike)
 
 if light:
     agent_lstm = DeepAgentLSTMLight.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
@@ -150,18 +152,19 @@ print("DONE LSTM")
 agent_lstm.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_lstm)
 deltas_lstm, hedging_err_lstm, S_t_lstm, V_t_lstm, A_t_lstm, B_t_lstm = agent_lstm.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_lstm = np.square(np.where(hedging_err_lstm > 0, hedging_err_lstm, 0))
+smse_lstm = np.mean(semi_square_hedging_err_lstm)
 rsmse_lstm = np.sqrt(np.mean(semi_square_hedging_err_lstm))
 
-print("LSTM TEST SET STATISTICS")
-S_t_lstm_last = S_t_lstm[-1, -5:]
-B_t_lstm_last = B_t_lstm[-1, -5:]
-print("S_t last: ", S_t_lstm_last)
-print("B_t last: ", B_t_lstm_last)
-S_t_lstm_selling = S_t_lstm_last * ((1 + 1 + B_t_lstm_last) ** beta - (1 + B_t_lstm_last) ** beta)
-print()
-print(S_t_lstm_selling)
-print("MUST BE BIGGER THAN")
-print(strike)
+# print("LSTM TEST SET STATISTICS")
+# S_t_lstm_last = S_t_lstm[-1, -5:]
+# B_t_lstm_last = B_t_lstm[-1, -5:]
+# print("S_t last: ", S_t_lstm_last)
+# print("B_t last: ", B_t_lstm_last)
+# S_t_lstm_selling = S_t_lstm_last * ((1 + 1 + B_t_lstm_last) ** beta - (1 + B_t_lstm_last) ** beta)
+# print()
+# print(S_t_lstm_selling)
+# print("MUST BE BIGGER THAN")
+# print(strike)
 
 if light:
     agent_gru = DeepAgentGRULight.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
@@ -178,18 +181,19 @@ print("DONE GRU")
 agent_gru.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_gru)
 deltas_gru, hedging_err_gru, S_t_gru, V_t_gru, A_t_gru, B_t_gru = agent_gru.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_gru = np.square(np.where(hedging_err_gru > 0, hedging_err_gru, 0))
+smse_gru = np.mean(semi_square_hedging_err_gru)
 rsmse_gru = np.sqrt(np.mean(semi_square_hedging_err_gru))
 
-print("GRU TEST SET STATISTICS")
-S_t_gru_last = S_t_gru[-1, -5:]
-B_t_gru_last = B_t_gru[-1, -5:]
-print("S_t last: ", S_t_gru_last)
-print("B_t last: ", B_t_gru_last)
-S_t_gru_selling = S_t_gru_last * ((1 + 1 + B_t_gru_last) ** beta - (1 + B_t_gru_last) ** beta)
-print()
-print(S_t_gru_selling)
-print("MUST BE BIGGER THAN")
-print(strike)
+# print("GRU TEST SET STATISTICS")
+# S_t_gru_last = S_t_gru[-1, -5:]
+# B_t_gru_last = B_t_gru[-1, -5:]
+# print("S_t last: ", S_t_gru_last)
+# print("B_t last: ", B_t_gru_last)
+# S_t_gru_selling = S_t_gru_last * ((1 + 1 + B_t_gru_last) ** beta - (1 + B_t_gru_last) ** beta)
+# print()
+# print(S_t_gru_selling)
+# print("MUST BE BIGGER THAN")
+# print(strike)
 
 if light:
     agent = DeepAgentLight.DeepAgent(nbs_point_traj, batch_size, r_borrow, r_lend, stock_dyn, params_vect, S_0, T, alpha, beta,
@@ -206,18 +210,22 @@ print("DONE FFNN")
 agent.model = torch.load("/home/a_eagu/Deep-Hedging-with-Market-Impact/" + name_ffnn)
 deltas_ffnn, hedging_err_ffnn, S_t_ffnn, V_t_ffnn, A_t_ffnn, B_t_ffnn = agent.test(test_size=test_size, test_set=test_set)
 semi_square_hedging_err_ffnn = np.square(np.where(hedging_err_ffnn > 0, hedging_err_ffnn, 0))
+smse_ffnn = np.mean(semi_square_hedging_err_ffnn)
 rsmse_ffnn = np.sqrt(np.mean(semi_square_hedging_err_ffnn))
 
-print("FFNN TEST SET STATISTICS")
-S_t_ffnn_last = S_t_ffnn[-1, -5:]
-B_t_ffnn_last = B_t_ffnn[-1, -5:]
-print("S_t last: ", S_t_ffnn_last)
-print("B_t last: ", B_t_ffnn_last)
-S_t_ffnn_selling = S_t_ffnn_last * ((1 + 1 + B_t_ffnn_last) ** beta - (1 + B_t_ffnn_last) ** beta)
-print()
-print(S_t_ffnn_selling)
-print("MUST BE BIGGER THAN")
-print(strike)
+# print("A_t_ffnn: ", A_t_ffnn)
+# print("B_t_ffnn: ", B_t_ffnn)
+
+# print("FFNN TEST SET STATISTICS")
+# S_t_ffnn_last = S_t_ffnn[-1, -5:]
+# B_t_ffnn_last = B_t_ffnn[-1, -5:]
+# print("S_t last: ", S_t_ffnn_last)
+# print("B_t last: ", B_t_ffnn_last)
+# S_t_ffnn_selling = S_t_ffnn_last * ((1 + 1 + B_t_ffnn_last) ** beta - (1 + B_t_ffnn_last) ** beta)
+# print()
+# print(S_t_ffnn_selling)
+# print("MUST BE BIGGER THAN")
+# print(strike)
 
 print(" ----------------- ")
 print(" Deep Hedging %s TRANSFORMER Results" % (loss_type))
@@ -241,107 +249,140 @@ Utils_general.print_stats(hedging_err_ffnn, deltas_ffnn, loss_type, "Deep hedge 
 
 test_set = np.concatenate(test_set.detach().cpu().numpy(), axis=1)
 
+# print("test_set: ", test_set)
+# print("test_set.shape: ", test_set.shape)
+
 print(" ----------------- ")
 print(" Delta Hedging Results")
 print(" ----------------- ")
 deltas_DH, hedging_err_DH = Utils_general.delta_hedge_res(test_set, r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type=option_type, position_type=position_type, strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas)
 Utils_general.print_stats(hedging_err_DH, deltas_DH, "Delta hedge", "Delta hedge", V_0)
 semi_square_hedging_err_DH = np.square(np.where(hedging_err_DH > 0, hedging_err_DH, 0))
+smse_DH = np.mean(semi_square_hedging_err_DH)
 rsmse_DH = np.sqrt(np.mean(semi_square_hedging_err_DH))
+
+# print("deltas_DH: ", deltas_DH)
+
+print(" ----------------- ")
+print("Leland Delta Hedging Results")
+print(" ----------------- ")
+deltas_DH_leland, hedging_err_DH_leland = Utils_general.delta_hedge_res(test_set, r_borrow, r_lend, params_vect[1], T, alpha, beta, option_type=option_type, position_type=position_type, strike=strike, V_0=V_0, nbs_shares=nbs_shares, hab=lambdas, Leland=True)
+Utils_general.print_stats(hedging_err_DH_leland, deltas_DH_leland, "Leland delta hedge", "Leland delta hedge", V_0)
+semi_square_hedging_err_DH_leland = np.square(np.where(hedging_err_DH_leland > 0, hedging_err_DH_leland, 0))
+smse_DH_leland = np.mean(semi_square_hedging_err_DH_leland)
+rsmse_DH_leland = np.sqrt(np.mean(semi_square_hedging_err_DH_leland))
+
+# print("deltas_DH_leland: ", deltas_DH_leland)
 
 print()
 
-print("|--------------------------------------Comparison of RSMSE--------------------------------------|")
-print("|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|")
-print("|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH))
-print("|-----------------------|---------------|---------------|---------------|-----------------------|")
+print("|------------------------------------------------------Comparison of RSMSE-----------------------------------------------------|")
+print("|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|\tLeland Delta Hedge\t|")
+print("|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH, rsmse_DH_leland))
+print("|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
 
 with open(path_prefix + "Comparison_RSMSE_" + str(nbs_point_traj) + ".txt", "w") as rsmse_file:
     # Writing data to a file
-    rsmse_file.write("|--------------------------------------Comparison of RSMSE--------------------------------------|\n")
-    rsmse_file.write("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
-    rsmse_file.write("|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    rsmse_file.write("|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH))
-    rsmse_file.write("|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    rsmse_file.write("|------------------------------------------------------Comparison of RSMSE------------------------------------------------------|\n")
+    rsmse_file.write("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\t\tLeland Delta Hedge\t\t|\n")
+    rsmse_file.write("|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    rsmse_file.write("|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(rsmse_trans, rsmse_gru, rsmse_lstm, rsmse_ffnn, rsmse_DH, rsmse_DH_leland))
+    rsmse_file.write("|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
 
 print()
 
-smse_trans_trans = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
-smse_trans_gru = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
-smse_trans_lstm = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
-smse_trans_ffnn = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
-smse_trans_DH = ttest_ind(semi_square_hedging_err_trans, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
+smse_trans_trans = f.cdf(smse_trans/smse_trans, test_size-1, test_size-1)
+smse_trans_gru = f.cdf(smse_trans/smse_gru, test_size-1, test_size-1)
+smse_trans_lstm = f.cdf(smse_trans/smse_lstm, test_size-1, test_size-1)
+smse_trans_ffnn = f.cdf(smse_trans/smse_ffnn, test_size-1, test_size-1)
+smse_trans_DH = f.cdf(smse_trans/smse_DH, test_size-1, test_size-1)
+smse_trans_leland = f.cdf(smse_trans/smse_DH_leland, test_size-1, test_size-1)
 
-smse_gru_trans = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
-smse_gru_gru = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
-smse_gru_lstm = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
-smse_gru_ffnn = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
-smse_gru_DH = ttest_ind(semi_square_hedging_err_gru, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
+smse_gru_trans = f.cdf(smse_gru/smse_trans, test_size-1, test_size-1)
+smse_gru_gru = f.cdf(smse_gru/smse_gru, test_size-1, test_size-1)
+smse_gru_lstm = f.cdf(smse_gru/smse_lstm, test_size-1, test_size-1)
+smse_gru_ffnn = f.cdf(smse_gru/smse_ffnn, test_size-1, test_size-1)
+smse_gru_DH = f.cdf(smse_gru/smse_DH, test_size-1, test_size-1)
+smse_gru_leland = f.cdf(smse_gru/smse_DH_leland, test_size-1, test_size-1)
 
-smse_lstm_trans = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
-smse_lstm_gru = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
-smse_lstm_lstm = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
-smse_lstm_ffnn = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
-smse_lstm_DH = ttest_ind(semi_square_hedging_err_lstm, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
+smse_lstm_trans = f.cdf(smse_lstm/smse_trans, test_size-1, test_size-1)
+smse_lstm_gru = f.cdf(smse_lstm/smse_gru, test_size-1, test_size-1)
+smse_lstm_lstm = f.cdf(smse_lstm/smse_lstm, test_size-1, test_size-1)
+smse_lstm_ffnn = f.cdf(smse_lstm/smse_ffnn, test_size-1, test_size-1)
+smse_lstm_DH = f.cdf(smse_lstm/smse_DH, test_size-1, test_size-1)
+smse_lstm_leland = f.cdf(smse_lstm/smse_DH_leland, test_size-1, test_size-1)
 
-smse_ffnn_trans = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
-smse_ffnn_gru = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
-smse_ffnn_lstm = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
-smse_ffnn_ffnn = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
-smse_ffnn_DH = ttest_ind(semi_square_hedging_err_ffnn, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
+smse_ffnn_trans = f.cdf(smse_ffnn/smse_trans, test_size-1, test_size-1)
+smse_ffnn_gru = f.cdf(smse_ffnn/smse_gru, test_size-1, test_size-1)
+smse_ffnn_lstm = f.cdf(smse_ffnn/smse_lstm, test_size-1, test_size-1)
+smse_ffnn_ffnn = f.cdf(smse_ffnn/smse_ffnn, test_size-1, test_size-1)
+smse_ffnn_DH = f.cdf(smse_ffnn/smse_DH, test_size-1, test_size-1)
+smse_ffnn_leland = f.cdf(smse_ffnn/smse_DH_leland, test_size-1, test_size-1)
 
-smse_DH_trans = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_trans, equal_var=False, alternative="less").pvalue
-smse_DH_gru = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_gru, equal_var=False, alternative="less").pvalue
-smse_DH_lstm = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_lstm, equal_var=False, alternative="less").pvalue
-smse_DH_ffnn = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_ffnn, equal_var=False, alternative="less").pvalue
-smse_DH_DH = ttest_ind(semi_square_hedging_err_DH, semi_square_hedging_err_DH, equal_var=False, alternative="less").pvalue
+smse_DH_trans = f.cdf(smse_DH/smse_trans, test_size-1, test_size-1)
+smse_DH_gru = f.cdf(smse_DH/smse_gru, test_size-1, test_size-1)
+smse_DH_lstm = f.cdf(smse_DH/smse_lstm, test_size-1, test_size-1)
+smse_DH_ffnn = f.cdf(smse_DH/smse_ffnn, test_size-1, test_size-1)
+smse_DH_DH = f.cdf(smse_DH/smse_DH, test_size-1, test_size-1)
+smse_DH_leland = f.cdf(smse_DH/smse_DH_leland, test_size-1, test_size-1)
 
-print("|------------------------------------------------T-test for Smaller SMSE------------------------------------------------|")
-print("|\t\t\t|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|")
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tTransformer\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_trans_trans, smse_trans_gru, smse_trans_lstm, smse_trans_ffnn, smse_trans_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tGRU\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_gru_trans, smse_gru_gru, smse_gru_lstm, smse_gru_ffnn, smse_gru_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tLSTM\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_lstm_trans, smse_lstm_gru, smse_lstm_lstm, smse_lstm_ffnn, smse_lstm_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_ffnn_trans, smse_ffnn_gru, smse_ffnn_lstm, smse_ffnn_ffnn, smse_ffnn_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+smse_leland_trans = f.cdf(smse_DH_leland/smse_trans, test_size-1, test_size-1)
+smse_leland_gru = f.cdf(smse_DH_leland/smse_gru, test_size-1, test_size-1)
+smse_leland_lstm = f.cdf(smse_DH_leland/smse_lstm, test_size-1, test_size-1)
+smse_leland_ffnn = f.cdf(smse_DH_leland/smse_ffnn, test_size-1, test_size-1)
+smse_leland_DH = f.cdf(smse_DH_leland/smse_DH, test_size-1, test_size-1)
+smse_leland_leland = f.cdf(smse_DH_leland/smse_DH_leland, test_size-1, test_size-1)
 
-with open(path_prefix + "SMSE_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as smse_file:
+print("|---------------------------------------------------------------F test for Smaller SMSE----------------------------------------------------------------|")
+print("|\t\t\t|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|\tLeland Delta Hedge\t|")
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tTransformer\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(smse_trans_trans, smse_trans_gru, smse_trans_lstm, smse_trans_ffnn, smse_trans_DH, smse_trans_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tGRU\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(smse_gru_trans, smse_gru_gru, smse_gru_lstm, smse_gru_ffnn, smse_gru_DH, smse_gru_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tLSTM\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(smse_lstm_trans, smse_lstm_gru, smse_lstm_lstm, smse_lstm_ffnn, smse_lstm_DH, smse_lstm_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(smse_ffnn_trans, smse_ffnn_gru, smse_ffnn_lstm, smse_ffnn_ffnn, smse_ffnn_DH, smse_ffnn_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH, smse_DH_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tLeland Delta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(smse_leland_trans, smse_leland_gru, smse_leland_lstm, smse_leland_ffnn, smse_leland_DH, smse_leland_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+
+with open(path_prefix + "SMSE_F_TEST_" + str(nbs_point_traj) + ".txt", "w") as smse_file:
     # Writing data to a file
-    smse_file.write("|------------------------------------------------T-test for Smaller SMSE------------------------------------------------|\n")
-    smse_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
-    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    smse_file.write("|\t\tTransformer\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_trans_trans, smse_trans_gru, smse_trans_lstm, smse_trans_ffnn, smse_trans_DH))
-    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    smse_file.write("|\t\tGRU\t\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_gru_trans, smse_gru_gru, smse_gru_lstm, smse_gru_ffnn, smse_gru_DH))
-    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    smse_file.write("|\t\tLSTM\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_lstm_trans, smse_lstm_gru, smse_lstm_lstm, smse_lstm_ffnn, smse_lstm_DH))
-    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    smse_file.write("|\t\tFFNN\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_ffnn_trans, smse_ffnn_gru, smse_ffnn_lstm, smse_ffnn_ffnn, smse_ffnn_DH))
-    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    smse_file.write("|\t\tDelta Hedge\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH))
-    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    smse_file.write("|----------------------------------------------------------------F test for Smaller SMSE----------------------------------------------------------------|\n")
+    smse_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\t\tLeland Delta Hedge\t\t|\n")
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    smse_file.write("|\t\tTransformer\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(smse_trans_trans, smse_trans_gru, smse_trans_lstm, smse_trans_ffnn, smse_trans_DH, smse_trans_leland))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    smse_file.write("|\t\tGRU\t\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(smse_gru_trans, smse_gru_gru, smse_gru_lstm, smse_gru_ffnn, smse_gru_DH, smse_gru_leland))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    smse_file.write("|\t\tLSTM\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(smse_lstm_trans, smse_lstm_gru, smse_lstm_lstm, smse_lstm_ffnn, smse_lstm_DH, smse_lstm_leland))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    smse_file.write("|\t\tFFNN\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(smse_ffnn_trans, smse_ffnn_gru, smse_ffnn_lstm, smse_ffnn_ffnn, smse_ffnn_DH, smse_ffnn_leland))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    smse_file.write("|\t\tDelta Hedge\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(smse_DH_trans, smse_DH_gru, smse_DH_lstm, smse_DH_ffnn, smse_DH_DH, smse_DH_leland))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    smse_file.write("|\tLeland Delta Hedge\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(smse_leland_trans, smse_leland_gru, smse_leland_lstm, smse_leland_ffnn, smse_leland_DH, smse_leland_leland))
+    smse_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
 
 print()
 
-print("|----------------------------------------------------------------------Comparison of Mean Hedging Losses------------------------------------------------------------------------|")
-print("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t\t|\t\tFFNN\t\t|\t\tDelta Hedge\t\t|")
-print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
-print("|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t\t|".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1)))
-print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|")
+print("|----------------------------------------------------------------------------------------------Comparison of Mean Hedging Losses-----------------------------------------------------------------------------------------------|")
+print("|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t\t|\t\tFFNN\t\t|\t\tDelta Hedge\t\t|\t\tLeland Delta Hedge\t\t|")
+print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|----------------------------------------------|")
+print("|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t|\t{:.4f} +- {:.4f}\t\t|\t{:.4f} +- {:.4f}\t\t|".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1), np.mean(hedging_err_DH_leland), np.std(hedging_err_DH_leland, ddof=1)))
+print("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|----------------------------------------------|")
 
 with open(path_prefix + "mean_hedging_error_" + str(nbs_point_traj) + ".txt", "w") as mean_file:
     # Writing data to a file
-    mean_file.write("|----------------------------------------------------------------------Comparison of Mean Hedging Losses------------------------------------------------------------------------|\n")
-    mean_file.write("|\t\t\t\tTransformer\t\t\t\t|\t\t\tGRU\t\t\t\t\t|\t\t\tLSTM\t\t\t\t|\t\t\tFFNN\t\t\t\t|\t\t\t\tDelta Hedge\t\t\t\t|\n")
-    mean_file.write("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|\n")
-    mean_file.write("|\t\t\t{:.4f} +- {:.4f}\t\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t\t{:.4f} +- {:.4f}\t\t\t|\n".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1)))
-    mean_file.write("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|\n")
+    mean_file.write("|----------------------------------------------------------------------------------------------Comparison of Mean Hedging Losses------------------------------------------------------------------------------------------------|\n")
+    mean_file.write("|\t\t\t\tTransformer\t\t\t\t|\t\t\tGRU\t\t\t\t\t|\t\t\tLSTM\t\t\t\t|\t\t\tFFNN\t\t\t\t|\t\t\t\tDelta Hedge\t\t\t\t|\t\t\t\tLeland Delta Hedge\t\t\t\t|\n")
+    mean_file.write("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|-----------------------------------------------|\n")
+    mean_file.write("|\t\t\t{:.4f} +- {:.4f}\t\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t{:.4f} +- {:.4f}\t\t|\t\t\t{:.4f} +- {:.4f}\t\t\t|\t\t\t{:.4f} +- {:.4f}\t\t\t\t\t|\n".format(np.mean(hedging_err_trans), np.std(hedging_err_trans, ddof=1), np.mean(hedging_err_gru), np.std(hedging_err_gru, ddof=1), np.mean(hedging_err_lstm), np.std(hedging_err_lstm, ddof=1), np.mean(hedging_err_ffnn), np.std(hedging_err_ffnn, ddof=1), np.mean(hedging_err_DH), np.std(hedging_err_DH, ddof=1), np.mean(hedging_err_DH_leland), np.std(hedging_err_DH_leland, ddof=1)))
+    mean_file.write("|---------------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|-----------------------------------------------|\n")
 
 print()
 
@@ -350,60 +391,76 @@ mean_trans_gru = ttest_ind(hedging_err_trans, hedging_err_gru, equal_var=False, 
 mean_trans_lstm = ttest_ind(hedging_err_trans, hedging_err_lstm, equal_var=False, alternative="less").pvalue
 mean_trans_ffnn = ttest_ind(hedging_err_trans, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
 mean_trans_DH = ttest_ind(hedging_err_trans, hedging_err_DH, equal_var=False, alternative="less").pvalue
+mean_trans_leland = ttest_ind(hedging_err_trans, hedging_err_DH_leland, equal_var=False, alternative="less").pvalue
 
 mean_gru_trans = ttest_ind(hedging_err_gru, hedging_err_trans, equal_var=False, alternative="less").pvalue
 mean_gru_gru = ttest_ind(hedging_err_gru, hedging_err_gru, equal_var=False, alternative="less").pvalue
 mean_gru_lstm = ttest_ind(hedging_err_gru, hedging_err_lstm, equal_var=False, alternative="less").pvalue
 mean_gru_ffnn = ttest_ind(hedging_err_gru, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
 mean_gru_DH = ttest_ind(hedging_err_gru, hedging_err_DH, equal_var=False, alternative="less").pvalue
+mean_gru_leland = ttest_ind(hedging_err_gru, hedging_err_DH_leland, equal_var=False, alternative="less").pvalue
 
 mean_lstm_trans = ttest_ind(hedging_err_lstm, hedging_err_trans, equal_var=False, alternative="less").pvalue
 mean_lstm_gru = ttest_ind(hedging_err_lstm, hedging_err_gru, equal_var=False, alternative="less").pvalue
 mean_lstm_lstm = ttest_ind(hedging_err_lstm, hedging_err_lstm, equal_var=False, alternative="less").pvalue
 mean_lstm_ffnn = ttest_ind(hedging_err_lstm, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
 mean_lstm_DH = ttest_ind(hedging_err_lstm, hedging_err_DH, equal_var=False, alternative="less").pvalue
+mean_lstm_leland = ttest_ind(hedging_err_lstm, hedging_err_DH_leland, equal_var=False, alternative="less").pvalue
 
 mean_ffnn_trans = ttest_ind(hedging_err_ffnn, hedging_err_trans, equal_var=False, alternative="less").pvalue
 mean_ffnn_gru = ttest_ind(hedging_err_ffnn, hedging_err_gru, equal_var=False, alternative="less").pvalue
 mean_ffnn_lstm = ttest_ind(hedging_err_ffnn, hedging_err_lstm, equal_var=False, alternative="less").pvalue
 mean_ffnn_ffnn = ttest_ind(hedging_err_ffnn, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
 mean_ffnn_DH = ttest_ind(hedging_err_ffnn, hedging_err_DH, equal_var=False, alternative="less").pvalue
+mean_ffnn_leland = ttest_ind(hedging_err_ffnn, hedging_err_DH_leland, equal_var=False, alternative="less").pvalue
 
 mean_DH_trans = ttest_ind(hedging_err_DH, hedging_err_trans, equal_var=False, alternative="less").pvalue
 mean_DH_gru = ttest_ind(hedging_err_DH, hedging_err_gru, equal_var=False, alternative="less").pvalue
 mean_DH_lstm = ttest_ind(hedging_err_DH, hedging_err_lstm, equal_var=False, alternative="less").pvalue
 mean_DH_ffnn = ttest_ind(hedging_err_DH, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
 mean_DH_DH = ttest_ind(hedging_err_DH, hedging_err_DH, equal_var=False, alternative="less").pvalue
+mean_DH_leland = ttest_ind(hedging_err_DH, hedging_err_DH_leland, equal_var=False, alternative="less").pvalue
 
-print("|----------------------------------------T-Test for Smaller Mean Hedging Losses-----------------------------------------|")
-print("|\t\t\t|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|")
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tTransformer\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_trans_trans, mean_trans_gru, mean_trans_lstm, mean_trans_ffnn, mean_trans_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tGRU\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_gru_trans, mean_gru_gru, mean_gru_lstm, mean_gru_ffnn, mean_gru_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tLSTM\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_lstm_trans, mean_lstm_gru, mean_lstm_lstm, mean_lstm_ffnn, mean_lstm_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_ffnn_trans, mean_ffnn_gru, mean_ffnn_lstm, mean_ffnn_ffnn, mean_ffnn_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
-print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH))
-print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|")
+mean_leland_trans = ttest_ind(hedging_err_DH_leland, hedging_err_trans, equal_var=False, alternative="less").pvalue
+mean_leland_gru = ttest_ind(hedging_err_DH_leland, hedging_err_gru, equal_var=False, alternative="less").pvalue
+mean_leland_lstm = ttest_ind(hedging_err_DH_leland, hedging_err_lstm, equal_var=False, alternative="less").pvalue
+mean_leland_ffnn = ttest_ind(hedging_err_DH_leland, hedging_err_ffnn, equal_var=False, alternative="less").pvalue
+mean_leland_DH = ttest_ind(hedging_err_DH_leland, hedging_err_DH, equal_var=False, alternative="less").pvalue
+mean_leland_leland = ttest_ind(hedging_err_DH_leland, hedging_err_DH_leland, equal_var=False, alternative="less").pvalue
+
+print("|--------------------------------------------------------T-Test for Smaller Mean Hedging Losses--------------------------------------------------------|")
+print("|\t\t\t|\tTransformer\t|\tGRU\t|\tLSTM\t|\tFFNN\t|\tDelta Hedge\t|\tLeland Delta Hedge\t|")
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tTransformer\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(mean_trans_trans, mean_trans_gru, mean_trans_lstm, mean_trans_ffnn, mean_trans_DH, mean_trans_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tGRU\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(mean_gru_trans, mean_gru_gru, mean_gru_lstm, mean_gru_ffnn, mean_gru_DH, mean_gru_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tLSTM\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(mean_lstm_trans, mean_lstm_gru, mean_lstm_lstm, mean_lstm_ffnn, mean_lstm_DH, mean_lstm_DH))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tFFNN\t\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(mean_ffnn_trans, mean_ffnn_gru, mean_ffnn_lstm, mean_ffnn_ffnn, mean_ffnn_DH, mean_ffnn_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tDelta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH, mean_DH_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
+print("|\tLeland Delta Hedge\t|\t{:.4f}\t\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t|\t{:.4f}\t\t|\t{:.4f}\t\t|".format(mean_leland_trans, mean_leland_gru, mean_leland_lstm, mean_leland_ffnn, mean_leland_DH, mean_leland_leland))
+print("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|------------------------------|")
 
 with open(path_prefix + "Mean_T_TEST_" + str(nbs_point_traj) + ".txt", "w") as mean_test_file:
     # Writing data to a file
-    mean_test_file.write("|----------------------------------------T-Test for Smaller Mean Hedging Losses-----------------------------------------|\n")
-    mean_test_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\n")
-    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    mean_test_file.write("|\t\tTransformer\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_trans_trans, mean_trans_gru, mean_trans_lstm, mean_trans_ffnn, mean_trans_DH))
-    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    mean_test_file.write("|\t\tGRU\t\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_gru_trans, mean_gru_gru, mean_gru_lstm, mean_gru_ffnn, mean_gru_DH))
-    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    mean_test_file.write("|\t\tLSTM\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_lstm_trans, mean_lstm_gru, mean_lstm_lstm, mean_lstm_ffnn, mean_lstm_DH))
-    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    mean_test_file.write("|\t\tFFNN\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_ffnn_trans, mean_ffnn_gru, mean_ffnn_lstm, mean_ffnn_ffnn, mean_ffnn_DH))
-    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
-    mean_test_file.write("|\t\tDelta Hedge\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\n".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH))
-    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|\n")
+    mean_test_file.write("|--------------------------------------------------------T-Test for Smaller Mean Hedging Losses---------------------------------------------------------|\n")
+    mean_test_file.write("|\t\t\t\t\t\t|\t\tTransformer\t\t|\t\tGRU\t\t|\t\tLSTM\t|\t\tFFNN\t|\t\tDelta Hedge\t\t|\t\tLeland Delta Hedge\t\t|\n")
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    mean_test_file.write("|\t\tTransformer\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(mean_trans_trans, mean_trans_gru, mean_trans_lstm, mean_trans_ffnn, mean_trans_DH, mean_trans_leland))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    mean_test_file.write("|\t\tGRU\t\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(mean_gru_trans, mean_gru_gru, mean_gru_lstm, mean_gru_ffnn, mean_gru_DH, mean_gru_leland))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    mean_test_file.write("|\t\tLSTM\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(mean_lstm_trans, mean_lstm_gru, mean_lstm_lstm, mean_lstm_ffnn, mean_lstm_DH, mean_lstm_leland))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    mean_test_file.write("|\t\tFFNN\t\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(mean_ffnn_trans, mean_ffnn_gru, mean_ffnn_lstm, mean_ffnn_ffnn, mean_ffnn_DH, mean_ffnn_leland))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    mean_test_file.write("|\t\tDelta Hedge\t\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(mean_DH_trans, mean_DH_gru, mean_DH_lstm, mean_DH_ffnn, mean_DH_DH, mean_DH_leland))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
+    mean_test_file.write("|\tLeland Delta Hedge\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t|\t\t{:.4f}\t\t\t|\t\t{:.4f}\t\t\t\t\t|\n".format(mean_leland_trans, mean_leland_gru, mean_leland_lstm, mean_leland_ffnn, mean_leland_DH, mean_leland_leland))
+    mean_test_file.write("|-----------------------|-----------------------|---------------|---------------|---------------|-----------------------|-------------------------------|\n")
 
 print()
 
@@ -504,6 +561,14 @@ plt.ylabel('Frequency')
 plt.legend()
 plt.title("Hedging losses for FFNN vs Delta-Hedge - " + str(nbs_point_traj))
 plt.savefig(path_prefix + "hedging_errors/Hedging_Errors_FFNN_DH" + str(nbs_point_traj) + ".png")
+
+fig = plt.figure(figsize=(10, 5))
+plt.hist([hedging_err_DH_leland, hedging_err_DH], bins=50, label=["Leland Delta-Hedge", "Black-Scholes Delta-Hedge"])
+plt.xlabel('Hedging losses')
+plt.ylabel('Frequency')
+plt.legend()
+plt.title("Hedging losses for Leland Delta-Hedge vs Black-Scholes Delta-Hedge - " + str(nbs_point_traj))
+plt.savefig(path_prefix + "hedging_errors/Hedging_Errors_Leland_DH" + str(nbs_point_traj) + ".png")
 
 # Does not work with Transformers
 # point_pred = agent.point_predict(t=6, S_t=1800, V_t=1, A_t=0, B_t=0, delta_t=0.0)
